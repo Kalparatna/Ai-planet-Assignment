@@ -1,0 +1,3 @@
+@echo off
+echo Starting Math Routing Agent client...
+npm run dev
