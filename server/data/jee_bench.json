@@ -1,0 +1,27 @@
+[
+  {
+    "problem": "Find the value of x in the equation 2x + 5 = 15.",
+    "answer": "x = 5",
+    "subject": "Algebra"
+  },
+  {
+    "problem": "If f(x) = x^2 - 4x + 3, find f(3).",
+    "answer": "f(3) = 0",
+    "subject": "Calculus"
+  },
+  {
+    "problem": "A particle moves along a straight line with position function s(t) = t^3 - 6t^2 + 9t, where s is in meters and t is in seconds. Find the velocity of the particle at t = 2 seconds.",
+    "answer": "v(2) = -3 m/s",
+    "subject": "Physics"
+  },
+  {
+    "problem": "Solve the differential equation dy/dx = 2x with the initial condition y(0) = 3.",
+    "answer": "y = x^2 + 3",
+    "subject": "Calculus"
+  },
+  {
+    "problem": "Find the area of a circle with radius 4 cm.",
+    "answer": "A = 16π cm²",
+    "subject": "Geometry"
+  }
+]
