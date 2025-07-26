@@ -62,13 +62,9 @@ class WebSearchService:
             # Enhance query for mathematical context
             enhanced_query = f"mathematical problem solution step by step: {query}"
             
-            # Call Tavily API
-            headers = {
-                "Content-Type": "application/json",
-                "X-API-Key": self.tavily_api_key
-            }
-            
+            # Call Tavily API with correct format
             payload = {
+                "api_key": self.tavily_api_key,
                 "query": enhanced_query,
                 "search_depth": "advanced",
                 "include_domains": [
@@ -76,13 +72,16 @@ class WebSearchService:
                     "mathworld.wolfram.com", "brilliant.org", "mathway.com",
                     "symbolab.com", "socratic.org", "chegg.com", "mathsgenie.co.uk"
                 ],
-                "max_results": 5
+                "max_results": 5,
+                "include_answer": True,
+                "include_raw_content": True
             }
             
             response = requests.post(
                 "https://api.tavily.com/search",
-                headers=headers,
-                json=payload
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=30
             )
             
             if response.status_code != 200:

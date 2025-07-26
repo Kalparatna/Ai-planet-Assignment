@@ -3,10 +3,11 @@ import json
 import logging
 from typing import Dict, Any, List, Optional, Union
 import numpy as np
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.schema import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_pinecone import PineconeVectorStore
+from pinecone import Pinecone, ServerlessSpec
+from langchain_pinecone import PineconeEmbeddings
+from langchain_core.documents import Document
 from langchain.retrievers.document_compressors import LLMChainExtractor
 
 # Create a custom retriever class since ContextualCompressionRetriever is not available in this version
@@ -35,16 +36,35 @@ logger = logging.getLogger(__name__)
 
 class KnowledgeBaseService:
     def __init__(self):
-        self.db_directory = "data/vectordb"
         self.math_data_file = "data/math_problems.json"
-        self.embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
+        
+        # Pinecone configuration
+        self.pinecone_api_key = os.getenv("PINECONE_API_KEY")
+        self.index_name = os.getenv("PINECONE_INDEX_NAME", "math-routing-agent")
+        self.environment = os.getenv("PINECONE_ENVIRONMENT", "us-east-1")
+        self.cloud = os.getenv("PINECONE_CLOUD", "aws")
+        self.embedding_model_name = os.getenv("PINECONE_EMBEDDING_MODEL", "llama-text-embed-v2")
         
         # Create directories if they don't exist
         os.makedirs("data", exist_ok=True)
-        os.makedirs(self.db_directory, exist_ok=True)
         
-        # Initialize the embedding model
-        self.embeddings = HuggingFaceEmbeddings(model_name=self.embedding_model)
+        # Initialize Pinecone
+        self.pc = Pinecone(api_key=self.pinecone_api_key)
+        
+        # Initialize embedding model with fallback
+        try:
+            # Try Pinecone's native embedding model first
+            self.embeddings = PineconeEmbeddings(
+                api_key=self.pinecone_api_key,
+                model=self.embedding_model_name  # Uses "llama-text-embed-v2" from .env
+            )
+            logger.info(f"Using Pinecone embeddings with model: {self.embedding_model_name}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Pinecone embeddings: {e}")
+            # Fallback to HuggingFace embeddings
+            from langchain_huggingface import HuggingFaceEmbeddings
+            self.embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+            logger.info("Using HuggingFace embeddings as fallback")
         
         # Initialize vector store
         self._initialize_vector_store()
@@ -56,52 +76,76 @@ class KnowledgeBaseService:
         self.compressor = LLMChainExtractor.from_llm(self.llm)
     
     def _initialize_vector_store(self):
-        """Initialize the vector store with math problems and solutions"""
+        """Initialize the Pinecone vector store with math problems and solutions"""
         try:
-            # Check if vector store already exists
-            if os.path.exists(os.path.join(self.db_directory, "chroma.sqlite3")):
-                self.vector_store = Chroma(persist_directory=self.db_directory, embedding_function=self.embeddings)
-                logger.info("Loaded existing vector store")
-                return
+            # Check if Pinecone index exists, create if not
+            if self.index_name not in self.pc.list_indexes().names():
+                logger.info(f"Creating Pinecone index: {self.index_name}")
+                # Get the dimension for the Pinecone embedding model
+                model_dimension = self._get_model_dimension(self.embedding_model_name)
+                
+                self.pc.create_index(
+                    name=self.index_name,
+                    dimension=model_dimension,
+                    metric="cosine",
+                    spec=ServerlessSpec(
+                        cloud=self.cloud,
+                        region=self.environment
+                    )
+                )
+                logger.info(f"Created Pinecone index: {self.index_name}")
             
-            # Create sample math problems if file doesn't exist
-            if not os.path.exists(self.math_data_file):
-                self._create_sample_math_data()
+            # Get the index
+            index = self.pc.Index(self.index_name)
             
-            # Load math problems
-            with open(self.math_data_file, "r") as f:
-                math_data = json.load(f)
-            
-            # Prepare documents for vector store
-            documents = []
-            for item in math_data:
-                # Create a document with the problem and solution
-                content = f"Problem: {item['problem']}\nSolution: {item['solution']}"
-                metadata = {
-                    "problem_id": item.get("id", ""),
-                    "category": item.get("category", ""),
-                    "difficulty": item.get("difficulty", ""),
-                    "tags": ",".join(item.get("tags", []))
-                }
-                documents.append(Document(page_content=content, metadata=metadata))
-            
-            # Split documents if needed
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-            split_documents = text_splitter.split_documents(documents)
-            
-            # Create and persist the vector store
-            self.vector_store = Chroma.from_documents(
-                documents=split_documents,
+            # Initialize PineconeVectorStore
+            self.vector_store = PineconeVectorStore(
+                index=index,
                 embedding=self.embeddings,
-                persist_directory=self.db_directory
+                text_key="text"
             )
-            self.vector_store.persist()
-            logger.info(f"Created vector store with {len(split_documents)} documents")
+            
+            # Check if index is empty and populate with sample data
+            index_stats = index.describe_index_stats()
+            if index_stats['total_vector_count'] == 0:
+                logger.info("Index is empty, populating with sample data...")
+                
+                # Create sample math problems if file doesn't exist
+                if not os.path.exists(self.math_data_file):
+                    self._create_sample_math_data()
+                
+                # Load math problems
+                with open(self.math_data_file, "r") as f:
+                    math_data = json.load(f)
+                
+                # Prepare documents for vector store
+                documents = []
+                for item in math_data:
+                    # Create a document with the problem and solution
+                    content = f"Problem: {item['problem']}\nSolution: {item['solution']}"
+                    metadata = {
+                        "problem_id": item.get("id", ""),
+                        "category": item.get("category", ""),
+                        "difficulty": item.get("difficulty", ""),
+                        "tags": ",".join(item.get("tags", []))
+                    }
+                    documents.append(Document(page_content=content, metadata=metadata))
+                
+                # Split documents if needed
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+                split_documents = text_splitter.split_documents(documents)
+                
+                # Add documents to Pinecone
+                self.vector_store.add_documents(split_documents)
+                logger.info(f"Added {len(split_documents)} documents to Pinecone index")
+            else:
+                logger.info(f"Loaded existing Pinecone index with {index_stats['total_vector_count']} vectors")
         
         except Exception as e:
-            logger.error(f"Error initializing vector store: {e}")
-            # Create an empty vector store as fallback
-            self.vector_store = Chroma(persist_directory=self.db_directory, embedding_function=self.embeddings)
+            logger.error(f"Error initializing Pinecone vector store: {e}")
+            # Fallback to local embeddings if Pinecone fails
+            logger.warning("Falling back to in-memory vector store")
+            self.vector_store = None
     
     def _create_sample_math_data(self):
         """Create sample math problems and solutions for the knowledge base"""
@@ -210,6 +254,25 @@ class KnowledgeBaseService:
             logger.error(f"Error querying knowledge base: {e}")
             return {"found": False}
     
+    def _get_model_dimension(self, model_name: str) -> int:
+        """Get the dimension for embedding model"""
+        # Check if we're using HuggingFace fallback
+        if hasattr(self.embeddings, 'model_name') and 'all-MiniLM-L6-v2' in str(self.embeddings.model_name):
+            return 384  # HuggingFace sentence-transformers dimension
+        
+        # Pinecone embedding model dimensions
+        model_dimensions = {
+            "multilingual-e5-large": 1024,
+            "text-embedding-ada-002": 1536,
+            "text-embedding-3-small": 1536,
+            "text-embedding-3-large": 3072,
+            "llama-text-embed-v2": 4096,  # Your model from .env
+            "text-embedding-gecko": 768,
+            "text-embedding-gecko-multilingual": 768
+        }
+        
+        return model_dimensions.get(model_name, 384)  # Default to 384 for HuggingFace fallback
+    
     def _cosine_similarity(self, vec1, vec2):
         """Calculate cosine similarity between two vectors"""
         dot_product = np.dot(vec1, vec2)
@@ -229,7 +292,6 @@ class KnowledgeBaseService:
             
             # Add to vector store
             self.vector_store.add_documents([document])
-            self.vector_store.persist()
             
             # Also add to the JSON file for backup
             if os.path.exists(self.math_data_file):

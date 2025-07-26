@@ -7,6 +7,7 @@ import logging
 from services.knowledge_base import KnowledgeBaseService
 from services.web_search import WebSearchService
 from services.math_solver import MathSolverService
+from services.response_formatter import ResponseFormatter
 from middleware.guardrails import input_guardrail, output_guardrail
 
 # Configure logging
@@ -19,10 +20,11 @@ router = APIRouter(prefix="/math", tags=["Math Queries"])
 knowledge_base_service = None
 web_search_service = None
 math_solver_service = None
+response_formatter = None
 
 # Helper function to get services
 def get_services():
-    global knowledge_base_service, web_search_service, math_solver_service
+    global knowledge_base_service, web_search_service, math_solver_service, response_formatter
     
     if knowledge_base_service is None:
         knowledge_base_service = KnowledgeBaseService()
@@ -30,8 +32,10 @@ def get_services():
         web_search_service = WebSearchService()
     if math_solver_service is None:
         math_solver_service = MathSolverService()
+    if response_formatter is None:
+        response_formatter = ResponseFormatter()
         
-    return knowledge_base_service, web_search_service, math_solver_service
+    return knowledge_base_service, web_search_service, math_solver_service, response_formatter
 
 # Request model
 class MathQuery(BaseModel):
@@ -53,7 +57,7 @@ async def solve_math_problem(
     """Solve a mathematical problem with step-by-step solution"""
     try:
         # Get service instances
-        knowledge_base_service, web_search_service, math_solver_service = get_services()
+        knowledge_base_service, web_search_service, math_solver_service, response_formatter = get_services()
         
         # Apply input guardrails
         validated_query = input_guardrail(math_query.query)
@@ -96,7 +100,19 @@ async def solve_math_problem(
         # Apply output guardrails
         response.solution = output_guardrail(response.solution)
         
-        return response
+        # Format the response for UI display
+        response_dict = response.dict()
+        formatted_response = response_formatter.format_api_response(response_dict)
+        
+        # Create new response with formatted data
+        formatted_math_response = MathResponse(
+            solution=formatted_response["solution"],
+            source=formatted_response["source"],
+            confidence=formatted_response["confidence"],
+            references=formatted_response.get("references")
+        )
+        
+        return formatted_math_response
     
     except Exception as e:
         logger.error(f"Error solving math problem: {e}", exc_info=True)

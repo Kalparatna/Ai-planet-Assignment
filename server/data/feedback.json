@@ -1,1 +1,29 @@
-[]
+[
+  {
+    "id": 1,
+    "query_id": "test-123",
+    "original_solution": "**Problem:** Find the derivative of x^2 **Solution:** The derivative is 2x",
+    "feedback": "The solution is correct but could use more detailed steps",
+    "rating": 4,
+    "corrections": "Please show the power rule application step by step",
+    "timestamp": "2025-07-26T11:55:32.821692"
+  },
+  {
+    "id": 2,
+    "query_id": "feedback-2-20250726115828",
+    "original_solution": "Problem: What is 4^2 Okay, let\\",
+    "feedback": "Good",
+    "rating": 5,
+    "corrections": null,
+    "timestamp": "2025-07-26T11:58:28.632777"
+  },
+  {
+    "id": 3,
+    "query_id": "feedback-3-20250726123324",
+    "original_solution": "**Problem:** An instrument store gives a 10% discount to all students off the original cost of an instrument. During a back to school sale an additional 15% is taken off the discounted price. Julie, a student at the local high school, purchases a flute for $306. How much did it originally cost? ### Solution: ### Step 1 **Step 1:** Problem: An instrument store gives a 10% discount to all students off the original cost of an instrument. During a back to school sale an additional 15% is taken off the discounted price. Julie, a student at the local high school, purchases a flute for $306. How much did it originally cost? Step 1: Understand the problem ## Your solution\u2019s ready to go! Step 2: Formulate a solution approach Our expert help has broken down your problem into an easy-to-learn solution you can count on. # Question: An instrument store gives a 10% \ufeffdiscount to all students off the original cost of an instrument. Step 3: Solve the problem During a back to school sale an additional 15% \ufeffis taken off the discounted price. Julie, a student at the local high school, purchases a flute for $306. \ufeffHow much did it originally cost?325375400408425 [...] student submitted image, transcription available Chegg Logo We need to determine the original cost of the flute after applying the successive discounts. Given: Ju... answer image blur ## Not the question you\u2019re looking for? Step 4: Verify the solution Post any question and get expert help quickly. ## Chegg Products & ServicesChegg Products & Services ### Chegg Products & Services ## CompanyCompany ### Company ## Chegg NetworkChegg Network ### Chegg Network ## Customer ServiceCustomer Service [...] ### Customer Service ## EducatorsEducators ### Educators An instrument store gives a 10% discount to all students off theoriginal cost of an instrument. During a back to school sale anadditional 15% is taken off the ... instrument Store gives a 10% discount to all students ... Julie, a student at the local high school purchases 105305 How originally cost? An instrument store gives a 10% discount to all students off the original cost of an instrument. During a back to school sale an additional 15% 0 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 0 answer 1 answer 1 answer 1 answer 1 answer ![\\[ A=\\left[\\begin{array}{lll} 0 & 1 & 1 \\\\ 0 & 1 & 0 \\end{array}\\right] \\quad B=\\left\\begin{array}{ll} 1 & 0 \\\\ 1 & 1 \\end{a 1 answer 1 answer 1 answer 0 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer [...] 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer ##### Get the most out of Chegg Study [...] # Get questions and answers for Other Math ##### Other Math Math: Questions from October 24, 2023 0 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 0 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer 1 answer Conclusion: This solution addresses the mathematical problem by breaking it down into manageable steps and applying the appropriate mathematical principles.",
+    "feedback": "Working Exellently",
+    "rating": 5,
+    "corrections": null,
+    "timestamp": "2025-07-26T12:33:24.252904"
+  }
+]

@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from langchain_core.runnables import RunnableSequence
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -61,10 +61,8 @@ class MathSolverService:
                 input_variables=["problem"]
             )
             
-            self.solution_chain = LLMChain(
-                llm=self.llm,
-                prompt=self.solution_prompt
-            )
+            # Create the chain using the new RunnableSequence approach
+            self.solution_chain = self.solution_prompt | self.llm
         
         except Exception as e:
             logger.error(f"Error initializing MathSolverService: {e}")
@@ -77,11 +75,19 @@ class MathSolverService:
             if not self.solution_chain:
                 return {"solution": "Sorry, I'm unable to generate a solution at the moment. Please try again later.", "confidence": 0}
             
-            # Generate solution
-            result = await self.solution_chain.arun(problem=problem)
+            # Generate solution using the new invoke method
+            result = await self.solution_chain.ainvoke({"problem": problem})
+            
+            # Extract content from LangChain response
+            if hasattr(result, 'content'):
+                solution_content = result.content
+            elif isinstance(result, str):
+                solution_content = result
+            else:
+                solution_content = str(result)
             
             # Format the solution
-            formatted_solution = f"Problem: {problem}\n\n{result}"
+            formatted_solution = f"Problem: {problem}\n\nSolution: {solution_content}"
             
             # Save the generated solution
             self._save_solution(problem, formatted_solution)
@@ -96,43 +102,77 @@ class MathSolverService:
             return {"solution": "Sorry, I encountered an error while generating the solution. Please try a different question.", "confidence": 0}
     
     def format_solution(self, solution: str, problem: str) -> str:
-        """Format a solution to ensure it's educational and step-by-step"""
-        # If solution doesn't start with the problem, add it
-        if not solution.startswith("Problem:"):
-            solution = f"Problem: {problem}\n\n{solution}"
+        """Format a solution to ensure it's clean and well-structured for UI display"""
         
-        # Check if solution has steps
-        if "Step" not in solution and "step" not in solution:
-            # Try to identify steps and format them
-            lines = solution.split("\n")
-            formatted_lines = []
-            step_count = 0
-            
-            for line in lines:
-                if line.strip() and "Problem:" not in line and "Solution:" not in line:
-                    # Check if line looks like it could be a step
-                    if re.search(r'^\d+[.)]\s', line) or re.search(r'^[a-z][.)]\s', line):
-                        # Already formatted as a step, just standardize
-                        step_count += 1
-                        formatted_line = f"Step {step_count}: {line.split(' ', 1)[1]}"
-                        formatted_lines.append(formatted_line)
-                    elif len(line) > 20 and not line.startswith("  "):
-                        # Looks like a substantial line, treat as a step
-                        step_count += 1
-                        formatted_lines.append(f"Step {step_count}: {line}")
-                    else:
-                        # Keep as is
-                        formatted_lines.append(line)
+        # Clean up HTML tags and formatting issues
+        solution = self._clean_html_formatting(solution)
+        
+        # Extract problem and solution parts
+        if "Problem:" in solution and "Solution:" in solution:
+            parts = solution.split("Solution:", 1)
+            problem_part = parts[0].replace("Problem:", "").strip()
+            solution_part = parts[1].strip()
+        else:
+            problem_part = problem
+            solution_part = solution
+        
+        # Format the solution with proper structure
+        formatted_solution = self._structure_solution(solution_part)
+        
+        # Combine with clean formatting
+        final_solution = f"**Problem:** {problem_part}\n\n**Solution:**\n\n{formatted_solution}"
+        
+        return final_solution
+    
+    def _clean_html_formatting(self, text: str) -> str:
+        """Clean HTML tags and formatting issues from text"""
+        import re
+        
+        # Replace HTML superscript tags with proper notation
+        text = re.sub(r'<sup>([^<]+)</sup>', r'^(\1)', text)
+        text = re.sub(r'<sub>([^<]+)</sub>', r'_(\1)', text)
+        
+        # Remove other HTML tags
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # Fix common mathematical notation
+        text = re.sub(r'x³', 'x^3', text)
+        text = re.sub(r'x²', 'x^2', text)
+        text = re.sub(r'(\d+)³', r'\1^3', text)
+        text = re.sub(r'(\d+)²', r'\1^2', text)
+        
+        # Clean up multiple spaces and newlines
+        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r'\n\s*\n', '\n\n', text)
+        
+        return text.strip()
+    
+    def _structure_solution(self, solution_text: str) -> str:
+        """Structure the solution with clear steps and formatting"""
+        
+        # Split into paragraphs
+        paragraphs = [p.strip() for p in solution_text.split('\n\n') if p.strip()]
+        
+        structured_parts = []
+        step_counter = 1
+        
+        for paragraph in paragraphs:
+            # Check if this looks like a step or major section
+            if any(keyword in paragraph.lower() for keyword in ['step', 'first', 'next', 'then', 'finally', 'therefore']):
+                # Format as a step
+                if not paragraph.lower().startswith('step'):
+                    structured_parts.append(f"**Step {step_counter}:** {paragraph}")
+                    step_counter += 1
                 else:
-                    formatted_lines.append(line)
-            
-            solution = "\n".join(formatted_lines)
+                    structured_parts.append(f"**{paragraph}**")
+            elif any(keyword in paragraph.lower() for keyword in ['problem', 'solution', 'answer', 'conclusion', 'result']):
+                # Format as a section header
+                structured_parts.append(f"**{paragraph}**")
+            else:
+                # Regular paragraph
+                structured_parts.append(paragraph)
         
-        # Ensure there's a conclusion
-        if "Conclusion" not in solution and "conclusion" not in solution:
-            solution += "\n\nConclusion: The problem has been solved step-by-step using the appropriate mathematical principles."
-        
-        return solution
+        return '\n\n'.join(structured_parts)
     
     def _save_solution(self, problem: str, solution: str) -> None:
         """Save generated solution for future reference"""

@@ -17,7 +17,7 @@ feedback_service = FeedbackService()
 
 # Feedback request model
 class FeedbackRequest(BaseModel):
-    query_id: str = Field(..., description="ID of the original query")
+    query_id: Optional[str] = Field(None, description="ID of the original query (auto-generated if not provided)")
     original_solution: str = Field(..., description="Original solution provided")
     feedback: str = Field(..., description="User feedback on the solution")
     rating: int = Field(..., ge=1, le=5, description="Rating from 1-5")
