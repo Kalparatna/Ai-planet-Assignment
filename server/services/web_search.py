@@ -28,6 +28,22 @@ class WebSearchService:
         if not os.path.exists(self.search_history_file):
             with open(self.search_history_file, "w") as f:
                 json.dump([], f)
+        
+        # Initialize Gemini for content formatting
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            self.llm = ChatGoogleGenerativeAI(
+                model="gemini-2.0-flash",
+                google_api_key=self.google_api_key,
+                temperature=0.2,
+                top_p=0.95,
+                top_k=40,
+                max_output_tokens=2048,
+            )
+            logger.info("Gemini initialized for web search content formatting")
+        except Exception as e:
+            logger.error(f"Failed to initialize Gemini: {e}")
+            self.llm = None
     
     async def search(self, query: str) -> Dict[str, Any]:
         """Search the web for mathematical problems and solutions"""
@@ -101,7 +117,7 @@ class WebSearchService:
                     references.append(item.get("url", ""))
                 
                 # Extract mathematical solution
-                solution = self._extract_math_solution(content, query)
+                solution = await self._extract_math_solution(content, query)
                 
                 if solution:
                     # Save search history
@@ -165,7 +181,7 @@ class WebSearchService:
                                 content = steps_div.get_text()
                         
                         # Extract solution
-                        solution = self._extract_math_solution(content, query)
+                        solution = await self._extract_math_solution(content, query)
                         
                         if solution:
                             # Save search history
@@ -188,8 +204,8 @@ class WebSearchService:
             logger.error(f"Error in web scraping: {e}")
             return {"found": False}
     
-    def _extract_math_solution(self, content: str, query: str) -> Optional[str]:
-        """Extract and format a mathematical solution from web content"""
+    async def _extract_math_solution(self, content: str, query: str) -> Optional[str]:
+        """Extract and format a mathematical solution from web content using Gemini"""
         if not content:
             return None
         
@@ -200,38 +216,85 @@ class WebSearchService:
         if len(content) < 50:
             return None
         
-        # Format as a step-by-step solution
+        # Use Gemini to format the web search content into a proper mathematical solution
+        if self.llm:
+            try:
+                prompt = f"""
+                You are a mathematical professor. I found some content from web search about a mathematical problem, but it's messy and unstructured. Please format it into a clean, step-by-step mathematical solution.
+
+                Original Question: {query}
+
+                Web Search Content:
+                {content}
+
+                Please provide a clean, educational solution with:
+                1. Clear problem statement
+                2. Step-by-step solution with proper mathematical notation
+                3. Final answer
+                4. Brief explanation of the mathematical concepts used
+
+                Format it as a proper mathematical solution that a student can easily understand. Remove any unnecessary content, advertisements, or irrelevant information. Focus only on the mathematical solution.
+
+                Do not include any references to websites or sources in the solution itself - just provide the clean mathematical content.
+                """
+                
+                response = await self.llm.ainvoke(prompt)
+                
+                # Extract content from response
+                if hasattr(response, 'content'):
+                    formatted_solution = response.content
+                else:
+                    formatted_solution = str(response)
+                
+                # Clean up the formatted solution
+                formatted_solution = formatted_solution.strip()
+                
+                # Ensure it starts with "Problem:" if not already
+                if not formatted_solution.startswith("Problem:"):
+                    formatted_solution = f"Problem: {query}\n\n{formatted_solution}"
+                
+                return formatted_solution
+                
+            except Exception as e:
+                logger.error(f"Error formatting solution with Gemini: {e}")
+                # Fall back to basic formatting if Gemini fails
+                return self._basic_format_solution(content, query)
+        else:
+            # Fall back to basic formatting if Gemini is not available
+            return self._basic_format_solution(content, query)
+    
+    def _basic_format_solution(self, content: str, query: str) -> str:
+        """Basic formatting fallback when Gemini is not available"""
         solution = f"Problem: {query}\n\n"
         
         # Look for step indicators
         steps = re.findall(r'(Step \d+[:.\s].*?)(?=Step \d+|$)', content, re.IGNORECASE | re.DOTALL)
         
         if steps:
-            for step in steps:
-                solution += step.strip() + "\n\n"
+            solution += "Solution:\n\n"
+            for i, step in enumerate(steps, 1):
+                solution += f"Step {i}: {step.strip()}\n\n"
         else:
             # If no explicit steps, try to break into logical parts
             sentences = re.split(r'(?<=[.!?])\s+', content)
             
             if len(sentences) > 3:
-                solution += "Step 1: Understand the problem\n"
+                solution += "Solution:\n\n"
+                solution += "Step 1: Understanding the problem\n"
                 solution += sentences[0] + "\n\n"
                 
-                solution += "Step 2: Formulate a solution approach\n"
+                solution += "Step 2: Solution approach\n"
                 solution += " ".join(sentences[1:3]) + "\n\n"
                 
-                solution += "Step 3: Solve the problem\n"
-                solution += " ".join(sentences[3:min(len(sentences), 8)]) + "\n\n"
+                solution += "Step 3: Solving\n"
+                solution += " ".join(sentences[3:min(len(sentences), 6)]) + "\n\n"
                 
-                if len(sentences) > 8:
-                    solution += "Step 4: Verify the solution\n"
-                    solution += " ".join(sentences[8:]) + "\n\n"
+                if len(sentences) > 6:
+                    solution += "Step 4: Final answer\n"
+                    solution += " ".join(sentences[6:]) + "\n\n"
             else:
                 # Not enough content to structure, just use as is
-                solution += "Solution:\n" + content
-        
-        # Add a conclusion
-        solution += "\nConclusion: This solution addresses the mathematical problem by breaking it down into manageable steps and applying the appropriate mathematical principles."
+                solution += "Solution:\n" + content[:500] + "...\n\n"
         
         return solution
     

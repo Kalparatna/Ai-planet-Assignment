@@ -1,0 +1,64 @@
+[
+  {
+    "id": 1,
+    "feedback_id": 1,
+    "query_id": "test-001",
+    "issue_types": [
+      "low_rating"
+    ],
+    "priority": "high",
+    "original_query": "What is 2+2? Solution: 2+2 = 4",
+    "rating": 2,
+    "feedback": "The solution is too simple and doesn't show the steps clearly.",
+    "corrections": "Please show the addition process step by step with carrying if needed.",
+    "status": "pending_review",
+    "timestamp": "2025-07-27T11:25:57.649901"
+  },
+  {
+    "id": 2,
+    "feedback_id": 4,
+    "query_id": "test-004",
+    "issue_types": [
+      "low_rating",
+      "negative_feedback"
+    ],
+    "priority": "high",
+    "original_query": "What is sin(90\u00b0)? Solution: sin(90\u00b0) = 0",
+    "rating": 1,
+    "feedback": "This is completely wrong! sin(90\u00b0) = 1",
+    "corrections": "sin(90\u00b0) = 1, not 0. Please check the unit circle.",
+    "status": "pending_review",
+    "timestamp": "2025-07-27T11:26:02.552572"
+  },
+  {
+    "id": 3,
+    "feedback_id": 5,
+    "query_id": "test-001",
+    "issue_types": [
+      "low_rating"
+    ],
+    "priority": "high",
+    "original_query": "What is 2+2? Solution: 2+2 = 4",
+    "rating": 2,
+    "feedback": "The solution is too simple and doesn't show the steps clearly.",
+    "corrections": "Please show the addition process step by step with carrying if needed.",
+    "status": "pending_review",
+    "timestamp": "2025-07-27T11:29:14.222371"
+  },
+  {
+    "id": 4,
+    "feedback_id": 8,
+    "query_id": "test-004",
+    "issue_types": [
+      "low_rating",
+      "negative_feedback"
+    ],
+    "priority": "high",
+    "original_query": "What is sin(90\u00b0)? Solution: sin(90\u00b0) = 0",
+    "rating": 1,
+    "feedback": "This is completely wrong! sin(90\u00b0) = 1",
+    "corrections": "sin(90\u00b0) = 1, not 0. Please check the unit circle.",
+    "status": "pending_review",
+    "timestamp": "2025-07-27T11:29:19.629663"
+  }
+]

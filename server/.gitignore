@@ -245,6 +245,11 @@ generated_solutions.json
 improved_solutions.json
 math_problems.json
 search_results.json
+processed_pdfs.json
+
+# PDF uploads
+uploads/
+*.pdf
 
 # Pinecone local cache
 .pinecone/

@@ -1,0 +1,56 @@
+[
+  {
+    "id": 1,
+    "query_id": "test-001",
+    "original_query": "What is 2+2? Solution: 2+2 = 4",
+    "original_solution": "Problem: What is 2+2? Solution: 2+2 = 4",
+    "improved_solution": "Problem: What is 2+2?\n\nSolution:\n\nWhile this problem is quite simple, let's break it down to illustrate the addition process clearly.\n\n1. **Understanding the problem:** We are asked to add the number 2 to itself.\n\n2. **Visual Representation (Optional):** Imagine you have two apples. Then someone gives you two more apples.\n\n3. **Performing the Addition:**\n   * We start with the first number: 2\n   * We add the second number: + 2\n\n4. **Result:** 2 + 2 = 4\n\nTherefore, the answer is 4.\n\n**Explanation of Improvements:**\n\n*   **Addresses Simplicity:** Acknowledges the simplicity but emphasizes the importance of showing steps.\n*   **Step-by-Step:** Clearly outlines the thought process and the addition operation.\n*   **Visual Aid (Optional):** Provides a visual representation to aid understanding, especially for those who benefit from visual learning.\n*   **Mathematically Accurate:** The solution remains mathematically correct.\n*   **Addresses Carrying (Even Though Not Needed):** While carrying isn't needed for this specific problem, the solution's structure is designed to be easily adaptable to problems *that do* require carrying. This demonstrates a good understanding of the student's request to show carrying \"if needed.\" The structure allows for easy insertion of carrying steps if the numbers were different (e.g., 7+5).\n",
+    "feedback": "The solution is too simple and doesn't show the steps clearly.",
+    "timestamp": "2025-07-27T11:25:57.644904"
+  },
+  {
+    "id": 2,
+    "query_id": "test-003",
+    "original_query": "Solve x\u00b2 - 4 = 0 Solution: x = \u00b12",
+    "original_solution": "Problem: Solve x\u00b2 - 4 = 0 Solution: x = \u00b12",
+    "improved_solution": "**Problem:** Solve x\u00b2 - 4 = 0\n\n**Solution:**\n\n1. **Recognize the difference of squares:** The equation x\u00b2 - 4 = 0 can be recognized as a difference of squares, where x\u00b2 is the square of x and 4 is the square of 2.\n\n2. **Factor the equation:**  We can factor the left side of the equation using the difference of squares formula: a\u00b2 - b\u00b2 = (a - b)(a + b).  In this case, a = x and b = 2.  Therefore:\n\n   x\u00b2 - 4 = (x - 2)(x + 2)\n\n   So, our equation becomes:\n\n   (x - 2)(x + 2) = 0\n\n3. **Apply the Zero Product Property:** The Zero Product Property states that if the product of two factors is zero, then at least one of the factors must be zero.  Therefore, we can set each factor equal to zero:\n\n   x - 2 = 0  or  x + 2 = 0\n\n4. **Solve for x:**\n\n   *  For x - 2 = 0, add 2 to both sides:\n      x = 2\n\n   *  For x + 2 = 0, subtract 2 from both sides:\n      x = -2\n\n5. **State the solution:** The solutions to the equation x\u00b2 - 4 = 0 are x = 2 and x = -2.  We can write this as:\n\n   x = \u00b12\n",
+    "feedback": "Correct answer but no steps shown",
+    "timestamp": "2025-07-27T11:26:00.253721"
+  },
+  {
+    "id": 3,
+    "query_id": "test-004",
+    "original_query": "What is sin(90\u00b0)? Solution: sin(90\u00b0) = 0",
+    "original_solution": "Problem: What is sin(90\u00b0)? Solution: sin(90\u00b0) = 0",
+    "improved_solution": "**Problem:** What is sin(90\u00b0)?\n\n**Original Incorrect Solution:** sin(90\u00b0) = 0\n\n**Student Feedback:** This is completely wrong! sin(90\u00b0) = 1. Please check the unit circle.\n\n**Improved Solution:**\n\n1.  **Understanding the Unit Circle:** The sine function, sin(\u03b8), represents the y-coordinate of a point on the unit circle corresponding to an angle \u03b8 measured counterclockwise from the positive x-axis.\n\n2.  **Locating 90\u00b0 on the Unit Circle:** An angle of 90\u00b0 corresponds to the point on the unit circle that lies directly on the positive y-axis.\n\n3.  **Coordinates at 90\u00b0:** The coordinates of the point on the unit circle at 90\u00b0 are (0, 1).\n\n4.  **Sine as the y-coordinate:** Since sin(\u03b8) represents the y-coordinate, sin(90\u00b0) is equal to the y-coordinate of the point (0, 1).\n\n5.  **Therefore:** sin(90\u00b0) = 1\n\n**Final Answer:** sin(90\u00b0) = 1\n",
+    "feedback": "This is completely wrong! sin(90\u00b0) = 1",
+    "timestamp": "2025-07-27T11:26:02.506006"
+  },
+  {
+    "id": 4,
+    "query_id": "test-001",
+    "original_query": "What is 2+2? Solution: 2+2 = 4",
+    "original_solution": "Problem: What is 2+2? Solution: 2+2 = 4",
+    "improved_solution": "Problem: What is 2+2?\n\nSolution:\n\nWhile this problem is quite simple, let's break it down to illustrate the addition process clearly.\n\n1. **Understanding the Problem:** We need to add the number 2 to itself.\n\n2. **Visual Representation (Optional):** Imagine you have two apples. Then someone gives you two more apples. How many apples do you have in total?\n\n3. **The Addition Process:**\n   * We are adding the digits in the ones place: 2 + 2.\n   * 2 + 2 equals 4.\n\n4. **The Result:** Since there are no other digits to add or any carrying needed (because the sum is less than 10), the final answer is simply 4.\n\nTherefore, 2 + 2 = 4\n",
+    "feedback": "The solution is too simple and doesn't show the steps clearly.",
+    "timestamp": "2025-07-27T11:29:14.213328"
+  },
+  {
+    "id": 5,
+    "query_id": "test-003",
+    "original_query": "Solve x\u00b2 - 4 = 0 Solution: x = \u00b12",
+    "original_solution": "Problem: Solve x\u00b2 - 4 = 0 Solution: x = \u00b12",
+    "improved_solution": "**Problem:** Solve x\u00b2 - 4 = 0\n\n**Solution:**\n\n1.  **Recognize the difference of squares:** The equation x\u00b2 - 4 = 0 can be recognized as a difference of squares, where x\u00b2 is one perfect square and 4 (which is 2\u00b2) is the other.\n\n2.  **Factor the equation:** We can factor the left side of the equation using the difference of squares formula: a\u00b2 - b\u00b2 = (a - b)(a + b).  In this case, a = x and b = 2. Therefore:\n\n    x\u00b2 - 4 = (x - 2)(x + 2)\n\n    So, our equation becomes:\n\n    (x - 2)(x + 2) = 0\n\n3.  **Apply the Zero Product Property:** The Zero Product Property states that if the product of two factors is zero, then at least one of the factors must be zero.  Therefore, either (x - 2) = 0 or (x + 2) = 0.\n\n4.  **Solve for x in each case:**\n\n    *   If x - 2 = 0, then adding 2 to both sides gives x = 2.\n    *   If x + 2 = 0, then subtracting 2 from both sides gives x = -2.\n\n5.  **State the solutions:** Therefore, the solutions to the equation x\u00b2 - 4 = 0 are x = 2 and x = -2.  We can write this as:\n\n    x = \u00b12\n\n**Final Answer:** x = \u00b12\n",
+    "feedback": "Correct answer but no steps shown",
+    "timestamp": "2025-07-27T11:29:16.730830"
+  },
+  {
+    "id": 6,
+    "query_id": "test-004",
+    "original_query": "What is sin(90\u00b0)? Solution: sin(90\u00b0) = 0",
+    "original_solution": "Problem: What is sin(90\u00b0)? Solution: sin(90\u00b0) = 0",
+    "improved_solution": "**Problem:** What is sin(90\u00b0)?\n\n**Original Solution (Incorrect):** sin(90\u00b0) = 0\n\n**Student Feedback:** This is completely wrong! sin(90\u00b0) = 1. Please check the unit circle.\n\n**Improved Solution:**\n\nTo determine the value of sin(90\u00b0), we can use the unit circle.\n\n1.  **The Unit Circle:** The unit circle is a circle with a radius of 1 centered at the origin (0, 0) in the Cartesian coordinate plane.\n\n2.  **Angles and Coordinates:** An angle \u03b8, measured counterclockwise from the positive x-axis, corresponds to a point (x, y) on the unit circle.\n\n3.  **Sine and Cosine:** The x-coordinate of this point is equal to cos(\u03b8), and the y-coordinate is equal to sin(\u03b8).  Therefore, (x, y) = (cos(\u03b8), sin(\u03b8)).\n\n4.  **90\u00b0 on the Unit Circle:** An angle of 90\u00b0 corresponds to the point (0, 1) on the unit circle.  This is because rotating counterclockwise from the positive x-axis by 90\u00b0 brings us to the point directly above the origin, which is (0, 1).\n\n5.  **Determining sin(90\u00b0):** Since the y-coordinate of the point (0, 1) is 1, and we know that sin(\u03b8) = y, we can conclude that sin(90\u00b0) = 1.\n\n**Therefore, sin(90\u00b0) = 1.**\n",
+    "feedback": "This is completely wrong! sin(90\u00b0) = 1",
+    "timestamp": "2025-07-27T11:29:19.626648"
+  }
+]

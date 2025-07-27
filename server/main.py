@@ -34,11 +34,13 @@ app.add_middleware(
 
 # Import modules after app initialization
 from routes import math_router
+from routes import pdf_router
 from middleware.guardrails import input_guardrail, output_guardrail
 from routes.feedback_router import feedback_router
 
 # Register routers
 app.include_router(math_router.router)
+app.include_router(pdf_router.router)
 app.include_router(feedback_router)
 
 # Root endpoint

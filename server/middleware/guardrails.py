@@ -1,10 +1,111 @@
 from typing import Dict, Any, List, Optional, Union
 import re
 import logging
+import json
+from datetime import datetime
+from langchain_google_genai import ChatGoogleGenerativeAI
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class AIGatewayGuardrails:
+    """Enhanced AI Gateway with comprehensive guardrails for educational math content"""
+    
+    def __init__(self):
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
+            google_api_key=os.getenv("GOOGLE_API_KEY")
+        )
+        
+        # Banned topics and terms for educational math content
+        self.banned_topics = [
+            "weapons", "illegal activities", "adult content", "gambling", 
+            "drugs", "violence", "hate speech", "discrimination", "politics",
+            "religion", "personal information", "medical advice", "legal advice"
+        ]
+        
+        # Math-specific allowed topics and keywords
+        self.allowed_math_topics = [
+            "algebra", "calculus", "geometry", "trigonometry", "statistics", 
+            "probability", "number theory", "discrete mathematics", "linear algebra",
+            "differential equations", "mathematical analysis", "topology", "combinatorics",
+            "optimization", "numerical analysis", "set theory", "logic", "arithmetic",
+            "area", "volume", "perimeter", "circumference", "radius", "diameter",
+            "triangle", "circle", "square", "rectangle", "polygon", "angle",
+            "sine", "cosine", "tangent", "logarithm", "exponential", "matrix",
+            "vector", "polynomial", "quadratic", "cubic", "linear", "formula",
+            "theorem", "proof", "graph", "plot", "coordinate", "axis", "physics",
+            "chemistry", "engineering mathematics", "applied mathematics"
+        ]
+        
+        # Privacy patterns to detect and redact
+        self.privacy_patterns = [
+            (r'\b\d{3}-\d{2}-\d{4}\b', '[SSN_REDACTED]'),  # SSN
+            (r'\b\d{3}-\d{3}-\d{4}\b', '[PHONE_REDACTED]'),  # Phone
+            (r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL_REDACTED]'),  # Email
+            (r'\b\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\b', '[CARD_REDACTED]'),  # Credit card
+        ]
+        
+        # Initialize guardrail logs
+        self.guardrail_logs = []
+    
+    async def advanced_content_filter(self, text: str) -> Dict[str, Any]:
+        """Use LLM to perform advanced content filtering"""
+        try:
+            prompt = f"""
+            Analyze the following text for appropriateness in an educational mathematics context.
+            
+            Text: "{text}"
+            
+            Check for:
+            1. Is this related to mathematics, physics, chemistry, or educational content?
+            2. Does it contain any inappropriate, harmful, or non-educational content?
+            3. Is it suitable for students of all ages?
+            4. Does it request personal information or contain privacy concerns?
+            
+            Respond with JSON format:
+            {{
+                "is_appropriate": true/false,
+                "is_educational": true/false,
+                "concerns": ["list of any concerns"],
+                "confidence": 0.0-1.0,
+                "reason": "explanation"
+            }}
+            """
+            
+            response = await self.llm.ainvoke(prompt)
+            result = json.loads(response.content)
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in advanced content filter: {e}")
+            return {
+                "is_appropriate": True,
+                "is_educational": True,
+                "concerns": [],
+                "confidence": 0.5,
+                "reason": "Filter unavailable, allowing with caution"
+            }
+    
+    def log_guardrail_action(self, action_type: str, content: str, result: str, reason: str):
+        """Log guardrail actions for monitoring and improvement"""
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "action_type": action_type,
+            "content_preview": content[:100] + "..." if len(content) > 100 else content,
+            "result": result,
+            "reason": reason
+        }
+        self.guardrail_logs.append(log_entry)
+        
+        # Keep only last 1000 logs
+        if len(self.guardrail_logs) > 1000:
+            self.guardrail_logs = self.guardrail_logs[-1000:]
+
+# Create global instance
+ai_gateway = AIGatewayGuardrails()
 
 # Banned topics and terms for educational math content
 BANNED_TOPICS = [
@@ -12,12 +113,17 @@ BANNED_TOPICS = [
     "drugs", "violence", "hate speech", "discrimination"
 ]
 
-# Math-specific allowed topics
+# Math-specific allowed topics and keywords
 ALLOWED_MATH_TOPICS = [
     "algebra", "calculus", "geometry", "trigonometry", "statistics", 
     "probability", "number theory", "discrete mathematics", "linear algebra",
     "differential equations", "mathematical analysis", "topology", "combinatorics",
-    "optimization", "numerical analysis", "set theory", "logic", "arithmetic"
+    "optimization", "numerical analysis", "set theory", "logic", "arithmetic",
+    "area", "volume", "perimeter", "circumference", "radius", "diameter",
+    "triangle", "circle", "square", "rectangle", "polygon", "angle",
+    "sine", "cosine", "tangent", "logarithm", "exponential", "matrix",
+    "vector", "polynomial", "quadratic", "cubic", "linear", "formula",
+    "theorem", "proof", "graph", "plot", "coordinate", "axis"
 ]
 
 def input_guardrail(query: str) -> str:

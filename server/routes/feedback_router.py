@@ -60,3 +60,64 @@ async def get_feedback_stats():
     except Exception as e:
         logger.error(f"Error getting feedback stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get feedback statistics: {str(e)}")
+
+@feedback_router.get("/learning-insights")
+async def get_learning_insights():
+    """Get insights from Human-in-the-Loop learning patterns"""
+    try:
+        insights = await feedback_service.get_learning_insights()
+        return insights
+    
+    except Exception as e:
+        logger.error(f"Error getting learning insights: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get learning insights: {str(e)}")
+
+@feedback_router.get("/quality-control")
+async def get_quality_control_issues():
+    """Get pending quality control issues for human review"""
+    try:
+        issues = await feedback_service.get_quality_control_issues()
+        return issues
+    
+    except Exception as e:
+        logger.error(f"Error getting quality control issues: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get quality control issues: {str(e)}")
+
+@feedback_router.post("/quality-control/{issue_id}/resolve")
+async def resolve_quality_issue(
+    issue_id: int,
+    resolution_data: Dict[str, str] = Body(...)
+):
+    """Resolve a quality control issue"""
+    try:
+        resolution = resolution_data.get("resolution", "")
+        reviewer = resolution_data.get("reviewer", "anonymous")
+        
+        result = await feedback_service.resolve_quality_issue(issue_id, resolution, reviewer)
+        return result
+    
+    except Exception as e:
+        logger.error(f"Error resolving quality issue: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to resolve quality issue: {str(e)}")
+
+@feedback_router.get("/improved-solution")
+async def get_improved_solution(query: str):
+    """Get improved solution for a query if available from HITL learning"""
+    try:
+        improved_solution = await feedback_service.get_improved_solution_for_query(query)
+        
+        if improved_solution:
+            return {
+                "found": True,
+                "improved_solution": improved_solution,
+                "source": "human_feedback_learning"
+            }
+        else:
+            return {
+                "found": False,
+                "message": "No improved solution available for this query"
+            }
+    
+    except Exception as e:
+        logger.error(f"Error getting improved solution: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get improved solution: {str(e)}")
