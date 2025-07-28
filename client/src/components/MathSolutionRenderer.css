@@ -1,0 +1,294 @@
+/* Math Solution Renderer Styles */
+
+.math-solution-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: #333;
+}
+
+/* Problem Section */
+.math-problem-section {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.problem-title {
+  margin: 0 0 15px 0;
+  font-size: 1.5em;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.problem-title::before {
+  content: "❓";
+  margin-right: 10px;
+  font-size: 1.2em;
+}
+
+.problem-content {
+  font-size: 1.1em;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Solution Sections */
+.math-solution-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.math-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e1e5e9;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.math-section:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Section Titles */
+.section-title {
+  margin: 0 0 15px 0;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.main-title {
+  font-size: 1.4em;
+  color: #2c3e50;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.step-title {
+  font-size: 1.2em;
+  color: #27ae60;
+}
+
+.step-number {
+  background: #27ae60;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.9em;
+  margin-right: 10px;
+  font-weight: 500;
+}
+
+.example-title {
+  font-size: 1.1em;
+  color: #e67e22;
+}
+
+.example-icon {
+  margin-right: 8px;
+  font-size: 1.2em;
+}
+
+.sub-title {
+  font-size: 1.1em;
+  color: #8e44ad;
+}
+
+/* Content Types */
+.section-content {
+  margin-top: 15px;
+}
+
+.math-text {
+  margin: 10px 0;
+  line-height: 1.7;
+  color: #444;
+}
+
+/* Mathematical Formulas */
+.math-formula {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 15px 0;
+  text-align: center;
+  position: relative;
+}
+
+.math-formula::before {
+  content: "📐";
+  position: absolute;
+  top: -10px;
+  left: 15px;
+  background: white;
+  padding: 0 5px;
+  font-size: 1.2em;
+}
+
+.formula-code {
+  font-family: 'Courier New', monospace;
+  font-size: 1.3em;
+  font-weight: 600;
+  color: #2c3e50;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.formula-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60px;
+}
+
+/* List Items */
+.math-list-item {
+  display: flex;
+  align-items: flex-start;
+  margin: 8px 0;
+  padding: 8px 0;
+}
+
+.bullet {
+  color: #3498db;
+  font-weight: bold;
+  margin-right: 10px;
+  font-size: 1.2em;
+  line-height: 1.4;
+}
+
+.item-content {
+  flex: 1;
+  line-height: 1.6;
+}
+
+.math-numbered-item {
+  margin: 8px 0;
+  padding: 10px 15px;
+  background: #f8f9fa;
+  border-left: 4px solid #3498db;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* Step Content */
+.step-content {
+  background: #f0f8f0;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #27ae60;
+}
+
+/* Example Content */
+.example-content {
+  background: #fff8e1;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #e67e22;
+}
+
+/* Special Section Types */
+.math-header-section {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border: none;
+}
+
+.math-step-section {
+  border-left: 5px solid #27ae60;
+}
+
+.math-example-section {
+  border-left: 5px solid #e67e22;
+}
+
+.math-formula-section {
+  background: #f8f9fa;
+  border: 2px dashed #dee2e6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .math-solution-container {
+    padding: 15px;
+  }
+  
+  .math-section {
+    padding: 15px;
+  }
+  
+  .problem-content {
+    padding: 12px;
+  }
+  
+  .formula-code {
+    font-size: 1.1em;
+  }
+  
+  .step-number {
+    padding: 3px 8px;
+    font-size: 0.8em;
+  }
+}
+
+/* Fallback for non-structured content */
+.math-solution-fallback {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e1e5e9;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Animation for loading */
+.math-section {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mathematical symbols enhancement */
+.formula-code {
+  letter-spacing: 1px;
+}
+
+/* Highlight important mathematical expressions in text */
+.math-text {
+  /* Auto-detect and style mathematical expressions */
+}
+
+.math-text:has-text("²"), 
+.math-text:has-text("³"), 
+.math-text:has-text("√"), 
+.math-text:has-text("=") {
+  font-family: 'Courier New', monospace;
+  background: #f8f9fa;
+  padding: 2px 4px;
+  border-radius: 3px;
+}

@@ -102,77 +102,16 @@ class MathSolverService:
             return {"solution": "Sorry, I encountered an error while generating the solution. Please try a different question.", "confidence": 0}
     
     def format_solution(self, solution: str, problem: str) -> str:
-        """Format a solution to ensure it's clean and well-structured for UI display"""
+        """Simple solution formatting - detailed formatting is handled by ResponseFormatter"""
         
-        # Clean up HTML tags and formatting issues
-        solution = self._clean_html_formatting(solution)
-        
-        # Extract problem and solution parts
-        if "Problem:" in solution and "Solution:" in solution:
-            parts = solution.split("Solution:", 1)
-            problem_part = parts[0].replace("Problem:", "").strip()
-            solution_part = parts[1].strip()
+        # Just return the solution with minimal formatting
+        # The ResponseFormatter will handle all the complex formatting
+        if solution.strip():
+            return solution.strip()
         else:
-            problem_part = problem
-            solution_part = solution
-        
-        # Format the solution with proper structure
-        formatted_solution = self._structure_solution(solution_part)
-        
-        # Combine with clean formatting
-        final_solution = f"**Problem:** {problem_part}\n\n**Solution:**\n\n{formatted_solution}"
-        
-        return final_solution
+            return f"Solution for: {problem}"
     
-    def _clean_html_formatting(self, text: str) -> str:
-        """Clean HTML tags and formatting issues from text"""
-        import re
-        
-        # Replace HTML superscript tags with proper notation
-        text = re.sub(r'<sup>([^<]+)</sup>', r'^(\1)', text)
-        text = re.sub(r'<sub>([^<]+)</sub>', r'_(\1)', text)
-        
-        # Remove other HTML tags
-        text = re.sub(r'<[^>]+>', '', text)
-        
-        # Fix common mathematical notation
-        text = re.sub(r'x³', 'x^3', text)
-        text = re.sub(r'x²', 'x^2', text)
-        text = re.sub(r'(\d+)³', r'\1^3', text)
-        text = re.sub(r'(\d+)²', r'\1^2', text)
-        
-        # Clean up multiple spaces and newlines
-        text = re.sub(r'\s+', ' ', text)
-        text = re.sub(r'\n\s*\n', '\n\n', text)
-        
-        return text.strip()
-    
-    def _structure_solution(self, solution_text: str) -> str:
-        """Structure the solution with clear steps and formatting"""
-        
-        # Split into paragraphs
-        paragraphs = [p.strip() for p in solution_text.split('\n\n') if p.strip()]
-        
-        structured_parts = []
-        step_counter = 1
-        
-        for paragraph in paragraphs:
-            # Check if this looks like a step or major section
-            if any(keyword in paragraph.lower() for keyword in ['step', 'first', 'next', 'then', 'finally', 'therefore']):
-                # Format as a step
-                if not paragraph.lower().startswith('step'):
-                    structured_parts.append(f"**Step {step_counter}:** {paragraph}")
-                    step_counter += 1
-                else:
-                    structured_parts.append(f"**{paragraph}**")
-            elif any(keyword in paragraph.lower() for keyword in ['problem', 'solution', 'answer', 'conclusion', 'result']):
-                # Format as a section header
-                structured_parts.append(f"**{paragraph}**")
-            else:
-                # Regular paragraph
-                structured_parts.append(paragraph)
-        
-        return '\n\n'.join(structured_parts)
+
     
     def _save_solution(self, problem: str, solution: str) -> None:
         """Save generated solution for future reference"""

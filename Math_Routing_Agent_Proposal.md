@@ -164,7 +164,7 @@ The Math Routing Agent represents a comprehensive approach to creating an AI-pow
 
 ### Dependencies
 
-- **Backend**: FastAPI, Uvicorn, LangChain, Chroma, DSPy, Google Generative AI, Tavily
+- **Backend**: FastAPI, Uvicorn, LangChain, Pinecone, DSPy, Google Generative AI, Tavily
 - **Frontend**: React, Vite, Axios
 - **Vector Database**: Chroma with HuggingFace Embeddings
 - **LLM**: Google Gemini 2.0 Flash

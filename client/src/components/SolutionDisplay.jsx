@@ -1,4 +1,5 @@
 import { FileText, Globe, Database, Cpu, MessageSquare } from './Icons';
+import MathSolutionRenderer from './MathSolutionRenderer';
 
 export default function SolutionDisplay({ solution, onFeedbackClick }) {
     const getSourceIcon = (source) => {
@@ -11,6 +12,8 @@ export default function SolutionDisplay({ solution, onFeedbackClick }) {
           return <Database className="h-4 w-4" />;
         case 'generated':
           return <Cpu className="h-4 w-4" />;
+        case 'hitl_improved':
+          return <MessageSquare className="h-4 w-4" />;
         default:
           return <Database className="h-4 w-4" />;
       }
@@ -26,6 +29,8 @@ export default function SolutionDisplay({ solution, onFeedbackClick }) {
           return 'bg-green-100 text-green-800';
         case 'generated':
           return 'bg-orange-100 text-orange-800';
+        case 'hitl_improved':
+          return 'bg-indigo-100 text-indigo-800';
         default:
           return 'bg-gray-100 text-gray-800';
       }
@@ -41,51 +46,59 @@ export default function SolutionDisplay({ solution, onFeedbackClick }) {
           return 'Knowledge Base';
         case 'generated':
           return 'AI Generated';
+        case 'hitl_improved':
+          return 'Community Improved';
         default:
           return source;
       }
     };
 
-    const formatSolution = (text) => {
-      return text.split('\n').map((line, index) => {
-        // Handle markdown-style formatting
-        if (line.startsWith('## ')) {
-          return <h3 key={index} className="text-lg font-semibold mt-4 mb-2 text-gray-900">{line.replace('## ', '')}</h3>;
-        }
-        if (line.startsWith('### ')) {
-          return <h4 key={index} className="text-md font-medium mt-3 mb-1 text-gray-800">{line.replace('### ', '')}</h4>;
-        }
-        if (line.startsWith('**') && line.endsWith('**')) {
-          return <p key={index} className="font-semibold mt-2 mb-1">{line.replace(/\*\*/g, '')}</p>;
-        }
-        if (line.trim() === '') {
-          return <br key={index} />;
-        }
-        return <p key={index} className="mb-1 leading-relaxed">{line}</p>;
-      });
-    };
-
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Solution</h2>
-          <div className="flex items-center space-x-3">
-            <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getSourceColor(solution.source)}`}>
-              {getSourceIcon(solution.source)}
-              <span>{getSourceLabel(solution.source)}</span>
-            </div>
-            <div className="text-sm text-gray-600">
-              {Math.round(solution.confidence * 100)}% confidence
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        {/* Header with source info */}
+        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Solution</h2>
+            <div className="flex items-center space-x-3">
+              <div className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium ${getSourceColor(solution.source)}`}>
+                {getSourceIcon(solution.source)}
+                <span>{getSourceLabel(solution.source)}</span>
+              </div>
+              <div className="text-sm text-gray-600 bg-white px-2 py-1 rounded border">
+                {Math.round(solution.confidence * 100)}% confidence
+              </div>
             </div>
           </div>
+          
+          {solution.source === 'hitl_improved' && (
+            <div className="mt-2 text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded inline-block">
+              🧠 Improved by community feedback
+            </div>
+          )}
+          
+          {solution.source === 'pdf_upload' && (
+            <div className="mt-2 text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded inline-block">
+              📄 Answer from your uploaded PDF
+            </div>
+          )}
         </div>
 
-        <div className="prose prose-sm max-w-none text-gray-700">
-          {formatSolution(solution.solution)}
+        {/* Main content - use structured renderer if available */}
+        <div className="p-0">
+          {solution.sections && solution.sections.length > 0 ? (
+            <MathSolutionRenderer response={solution} />
+          ) : (
+            <div className="p-6">
+              <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
+                {solution.solution}
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* References section */}
         {solution.references?.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-gray-200">
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
             <h3 className="font-medium text-gray-900 mb-2 flex items-center">
               <FileText className="h-4 w-4 mr-1" />
               References:
@@ -111,20 +124,21 @@ export default function SolutionDisplay({ solution, onFeedbackClick }) {
           </div>
         )}
 
-        <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between items-center">
-          <button
-            onClick={onFeedbackClick}
-            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200"
-          >
-            <MessageSquare className="h-4 w-4 mr-1" />
-            Provide Feedback
-          </button>
-          
-          {solution.source === 'pdf_upload' && (
-            <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded">
-              ✓ Answer from your uploaded PDF
+        {/* Footer with feedback button */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="flex justify-between items-center">
+            <button
+              onClick={onFeedbackClick}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors duration-200"
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Provide Feedback
+            </button>
+            
+            <div className="text-xs text-gray-500">
+              Help improve this solution with your feedback
             </div>
-          )}
+          </div>
         </div>
       </div>
     );
