@@ -178,5 +178,17 @@
       "https://www.chegg.com/textbooks/islamic-mystical-poetry-1st-edition-9780140424737-0140424733"
     ],
     "timestamp": "2025-07-28T16:58:09.016461"
+  },
+  {
+    "query": "An instrument store gives a 10% discount to all students off the original cost of an instrument. During a back to school sale an additional 15% is taken off the discounted price. Julie, a student at the local high school, purchases a flute for $306. How much did it originally cost?",
+    "solution": "Problem: An instrument store gives a 10% discount to all students off the original cost of an instrument. During a back to school sale an additional 15% is taken off the discounted price. Julie, a student at the local high school, purchases a flute for $306. How much did it originally cost?\n\n## Problem Statement\n\nAn instrument store gives a 10% discount to all students off the original cost of an instrument. During a back-to-school sale, an additional 15% is taken off the discounted price. Julie, a student at the local high school, purchases a flute for $306. How much did the flute originally cost?\n\n## Solution\n\nLet 'x' be the original price of the flute.\n\n**Step 1: Calculate the price after the student discount.**\n\nA 10% discount means Julie pays 100% - 10% = 90% of the original price.  Therefore, the price after the student discount is:\n\n0.  90 * x = 0.9x\n\n**Step 2: Calculate the price after the back-to-school discount.**\n\nAn additional 15% discount is applied to the discounted price (0.9x). This means Julie pays 100% - 15% = 85% of the discounted price. Therefore, the price after the back-to-school discount is:\n\n1.  85 * (0.9x) = 0.85 * 0.9x = 0.765x\n\n**Step 3: Set up the equation.**\n\nWe know that the final price Julie paid is $306.  Therefore, we can set up the following equation:\n\n2.  765x = 306\n\n**Step 4: Solve for x.**\n\nTo find the original price (x), divide both sides of the equation by 0.765:\n\nx = 306 / 0.765\n\nx = 400\n\n## Final Answer\n\nThe original cost of the flute was $400.\n\n## Explanation of Mathematical Concepts Used\n\nThis problem involves the concept of percentages and successive discounts.\n\n*   **Percentage:** A percentage is a way of expressing a number as a fraction of 100. For example, 10% is equivalent to 10/100 or 0.1.\n*   **Successive Discounts:** When multiple discounts are applied one after another, they are called successive discounts. It's important to note that the second discount is applied to the price *after* the first discount has been applied, not to the original price. In this problem, we first calculated the price after the 10% student discount and then applied the 15% back-to-school discount to that discounted price.",
+    "references": [
+      "https://www.wyzant.com/resources/answers/107871/an_instrument_store_gives_10_discount_to_all_students_off_the_original_cost_of_instrument_during_back_to_school_sale_on",
+      "http://mathcentral.uregina.ca/QQ/database/QQ.09.08/h/joanna1.html",
+      "https://mathematics11.quora.com/A-store-gives-a-10-discount-to-all-students-off-the-original-cost-of-an-item-During-a-back-to-school-sale-an-another-1",
+      "http://www.algebra.com/algebra/homework/percentage/percentage.faq.question.252905.html",
+      "https://www.wyzant.com/resources/answers/107589/an_instrument_store_gives_10_discount_to_all_students"
+    ],
+    "timestamp": "2025-07-30T16:23:59.108167"
   }
 ]
