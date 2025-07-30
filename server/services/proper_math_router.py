@@ -89,14 +89,11 @@ class ProperMathRouter:
             return self._format_error_response(validated_query, response_time, str(e))
     
     async def _search_knowledge_base(self, query: str) -> Optional[Dict[str, Any]]:
-        """PHASE 1: Search Knowledge Base (JEE Bench + Vector DB)"""
+        """PHASE 1: Search Local Knowledge Base ONLY (No JEE Bench)"""
         try:
-            # Search JEE Bench dataset properly
-            jee_result = await self._search_jee_bench_properly(query)
-            if jee_result:
-                return jee_result
+            logger.info("🔍 Searching local knowledge base...")
             
-            # Search Vector DB (Pinecone)
+            # Search Vector DB (Pinecone) - local data only
             vector_result = await self._search_vector_db(query)
             if vector_result:
                 return vector_result
@@ -106,88 +103,66 @@ class ProperMathRouter:
             if pattern_result:
                 return pattern_result
             
-            logger.info("❌ Not found in Knowledge Base")
+            # Search local math problems data if exists
+            local_result = await self._search_local_data(query)
+            if local_result:
+                return local_result
+            
+            logger.info("❌ Not found in Local Knowledge Base")
             return None
             
         except Exception as e:
             logger.error(f"Knowledge base search error: {e}")
             return None
     
-    async def _search_jee_bench_properly(self, query: str) -> Optional[Dict[str, Any]]:
-        """Search JEE Bench dataset from MongoDB with proper validation"""
+    async def _search_local_data(self, query: str) -> Optional[Dict[str, Any]]:
+        """Search local math problems data if exists"""
         try:
-            logger.info("🔍 Searching JEE Bench in MongoDB...")
+            import json
+            import os
             
-            # Search JEE Bench data in MongoDB using text search
-            pipeline = [
-                {
-                    "$match": {
-                        "$text": {"$search": query}
-                    }
-                },
-                {
-                    "$addFields": {
-                        "score": {"$meta": "textScore"}
-                    }
-                },
-                {
-                    "$match": {
-                        "score": {"$gte": 0.5}  # Minimum relevance score
-                    }
-                },
-                {
-                    "$sort": {"score": -1}
-                },
-                {
-                    "$limit": 1
-                }
+            # Check for local math problems data
+            local_files = [
+                "data/math_problems.json",
+                "data/sample_data.json",
+                "data/generated_solutions.json"
             ]
             
-            # Execute search
-            cursor = mongodb_service.db.jee_bench_data.aggregate(pipeline)
-            results = await cursor.to_list(length=1)
+            for file_path in local_files:
+                if os.path.exists(file_path):
+                    logger.info(f"🔍 Searching local data: {file_path}")
+                    
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        
+                        # Search through local data
+                        if isinstance(data, list):
+                            for item in data:
+                                problem = item.get("problem", "").lower()
+                                query_lower = query.lower()
+                                
+                                # Simple keyword matching
+                                if any(word in problem for word in query_lower.split() if len(word) > 2):
+                                    solution = item.get("solution", "")
+                                    if len(solution) > 50:  # Ensure substantial solution
+                                        logger.info(f"✅ Found in local data: {file_path}")
+                                        return {
+                                            "found": True,
+                                            "solution": f"**Problem:** {item.get('problem', query)}\n\n**Solution:**\n{solution}",
+                                            "confidence": 0.8,
+                                            "source": "Local Data",
+                                            "references": [f"📁 {file_path}"]
+                                        }
+                    except Exception as file_error:
+                        logger.warning(f"Error reading {file_path}: {file_error}")
+                        continue
             
-            if results:
-                best_match = results[0]
-                score = best_match.get("score", 0)
-                
-                logger.info(f"✅ Found JEE Bench match with {score:.2f} relevance score")
-                
-                return {
-                    "found": True,
-                    "solution": f"**Problem:** {best_match.get('problem', '')}\n\n**Solution:**\n{best_match.get('solution', '')}",
-                    "confidence": min(0.9, score / 2 + 0.5),  # Convert score to confidence
-                    "source": "JEE Bench Dataset (MongoDB)",
-                    "references": [f"🎯 JEE Bench - {best_match.get('subject', 'Mathematics')}"]
-                }
-            
-            # Fallback: Try keyword-based search if text search fails
-            logger.info("🔍 Trying keyword-based search in JEE Bench...")
-            query_words = query.lower().split()
-            
-            # Create regex pattern for keyword matching
-            keyword_pattern = "|".join([f"(?i){word}" for word in query_words if len(word) > 2])
-            
-            if keyword_pattern:
-                result = await mongodb_service.db.jee_bench_data.find_one({
-                    "problem": {"$regex": keyword_pattern}
-                })
-                
-                if result:
-                    logger.info("✅ Found JEE Bench match via keyword search")
-                    return {
-                        "found": True,
-                        "solution": f"**Problem:** {result.get('problem', '')}\n\n**Solution:**\n{result.get('solution', '')}",
-                        "confidence": 0.8,
-                        "source": "JEE Bench Dataset (MongoDB)",
-                        "references": [f"🎯 JEE Bench - {result.get('subject', 'Mathematics')}"]
-                    }
-            
-            logger.info("❌ No relevant match in JEE Bench dataset")
+            logger.info("❌ No relevant match in local data")
             return None
             
         except Exception as e:
-            logger.error(f"JEE Bench MongoDB search error: {e}")
+            logger.error(f"Local data search error: {e}")
             return None
     
     async def _search_vector_db(self, query: str) -> Optional[Dict[str, Any]]:
@@ -274,62 +249,74 @@ class ProperMathRouter:
             return None
     
     async def _search_web(self, query: str) -> Optional[Dict[str, Any]]:
-        """PHASE 2: Web Search using Tavily with MongoDB caching"""
+        """PHASE 2: Web Search - 7 Second Max Timeout, No Web Scraping"""
         try:
-            logger.info("🌐 Checking web search cache in MongoDB...")
+            web_start_time = time.time()
+            logger.info("🌐 Web Search Phase (7s max timeout)...")
             
             # First check MongoDB cache for web search results
-            cached_result = await mongodb_service.get_web_search_cache(query)
-            if cached_result and cached_result.get("found", False):
-                logger.info("✅ Found cached web search result in MongoDB")
-                return {
-                    "found": True,
-                    "solution": f"**Problem:** {query}\n\n**Cached Web Search Solution:**\n{cached_result.get('solution', '')}",
-                    "confidence": cached_result.get("confidence", 0.7),
-                    "source": "Web Search Cache (MongoDB)",
-                    "references": cached_result.get("references", ["🌐 Cached Web Search"])
-                }
-            
-            logger.info("🌐 Performing fresh Tavily web search...")
-            
-            # Use the web search service for fresh search
-            result = await self.web_search.search(query)
-            
-            if result and result.get("found", False):
-                solution = result.get("solution", "")
-                
-                # Validate web search result
-                if len(solution) > 50:  # Ensure substantial content
-                    logger.info("✅ Web search returned valid result")
-                    
-                    # Cache the result in MongoDB for future use
-                    try:
-                        await mongodb_service.store_web_search_cache(
-                            query,
-                            solution,
-                            result.get("references", []),
-                            result.get("confidence", 0.7)
-                        )
-                        logger.info("✅ Cached web search result in MongoDB")
-                    except Exception as cache_error:
-                        logger.warning(f"Failed to cache web search result: {cache_error}")
-                    
+            try:
+                cached_result = await mongodb_service.get_web_search_cache(query)
+                if cached_result and cached_result.get("found", False):
+                    logger.info("✅ Found cached web search result")
                     return {
                         "found": True,
-                        "solution": f"**Problem:** {query}\n\n**Web Search Solution:**\n{solution}",
-                        "confidence": result.get("confidence", 0.7),
-                        "source": "Web Search (Tavily)",
-                        "references": result.get("references", ["🌐 Web Search"])
+                        "solution": self._create_concise_solution(cached_result.get('solution', ''), query),
+                        "confidence": cached_result.get("confidence", 0.7),
+                        "source": "Web Search Cache",
+                        "references": cached_result.get("references", ["🌐 Cached"])
                     }
+            except Exception as cache_error:
+                logger.warning(f"Cache check failed: {cache_error}")
+            
+            # Perform fresh web search with 7-second timeout
+            logger.info("🌐 Fresh Tavily search (7s timeout)...")
+            
+            try:
+                # Use asyncio.wait_for for strict 7-second timeout
+                result = await asyncio.wait_for(
+                    self.web_search.search(query),
+                    timeout=7.0  # STRICT 7-second timeout
+                )
+                
+                web_time = time.time() - web_start_time
+                logger.info(f"⏱️ Web search completed in {web_time:.3f}s")
+                
+                if result and result.get("found", False):
+                    solution = result.get("solution", "")
+                    
+                    if len(solution) > 30:  # Minimum content check
+                        logger.info("✅ Web search returned valid result")
+                        
+                        # Create concise solution
+                        concise_solution = self._create_concise_solution(solution, query)
+                        
+                        # Cache the result for future use (async, don't wait)
+                        asyncio.create_task(self._cache_web_result(query, concise_solution, result))
+                        
+                        return {
+                            "found": True,
+                            "solution": concise_solution,
+                            "confidence": result.get("confidence", 0.7),
+                            "source": "Web Search (Tavily)",
+                            "references": result.get("references", ["🌐 Web Search"])[:2]  # Max 2 references
+                        }
+                    else:
+                        logger.warning("⚠️ Web search returned insufficient content")
                 else:
-                    logger.warning("⚠️ Web search returned insufficient content")
-            else:
-                logger.info("❌ Web search found no results")
+                    logger.info("❌ Web search found no results")
+                
+            except asyncio.TimeoutError:
+                logger.warning("⏰ Web search timed out after 7 seconds - moving to AI generation")
+                return None
+            except Exception as search_error:
+                logger.error(f"Web search failed: {search_error}")
+                return None
             
             return None
             
         except Exception as e:
-            logger.error(f"Web search error: {e}")
+            logger.error(f"Web search phase error: {e}")
             return None
     
     async def _generate_ai_solution(self, query: str) -> Optional[Dict[str, Any]]:
@@ -370,7 +357,7 @@ class ProperMathRouter:
             import os
             
             llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 google_api_key=os.getenv("GOOGLE_API_KEY"),
                 temperature=0.2,
                 max_output_tokens=1024
@@ -392,9 +379,11 @@ Format your response as an educational solution that helps students learn."""
             solution = response.content if hasattr(response, 'content') else str(response)
             
             if solution and len(solution) > 100:
+                # Create concise solution for better performance
+                concise_solution = self._create_concise_solution(solution, query)
                 return {
                     "found": True,
-                    "solution": f"**Problem:** {query}\n\n**AI Generated Solution:**\n{solution}",
+                    "solution": concise_solution,
                     "confidence": 0.8,
                     "source": "AI Generated (Gemini)",
                     "references": ["🤖 Gemini AI"]
@@ -539,6 +528,117 @@ Step 4: Check the Answer
             
         except Exception as e:
             logger.error(f"Error storing successful solution: {e}")
+    
+    async def _create_complete_medium_solution(self, raw_solution: str, query: str, source_type: str = "web") -> str:
+        """Create complete medium-length solution using AI enhancement"""
+        try:
+            if not raw_solution or len(raw_solution) < 20:
+                return await self._generate_ai_medium_solution(query)
+            
+            # Use AI to create a complete, medium-length solution
+            try:
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                
+                llm = ChatGoogleGenerativeAI(
+                    model="gemini-2.5-flash",
+                    google_api_key=os.getenv("GOOGLE_API_KEY"),
+                    temperature=0.2,
+                    max_output_tokens=800  # Medium length
+                )
+                
+                prompt = f"""You are a math teacher. Based on the following web search content, create a COMPLETE medium-length solution.
+
+Original Question: {query}
+
+Web Search Content: {raw_solution[:500]}
+
+Requirements:
+1. Provide a COMPLETE step-by-step solution (not partial)
+2. Medium length (not too short, not too long)
+3. Include all necessary steps
+4. Show final answer clearly
+5. Make it educational and easy to understand
+
+Format:
+**Problem:** [restate the problem]
+**Solution:**
+Step 1: [first step with explanation]
+Step 2: [second step with explanation]
+...
+**Answer:** [final answer]
+
+Make sure the solution is COMPLETE and HELPFUL for learning."""
+                
+                response = await llm.ainvoke(prompt)
+                enhanced_solution = response.content if hasattr(response, 'content') else str(response)
+                
+                if enhanced_solution and len(enhanced_solution) > 100:
+                    return enhanced_solution
+                else:
+                    return await self._generate_ai_medium_solution(query)
+                    
+            except Exception as ai_error:
+                logger.warning(f"AI enhancement failed: {ai_error}")
+                return await self._generate_ai_medium_solution(query)
+            
+        except Exception as e:
+            logger.error(f"Error creating complete solution: {e}")
+            return await self._generate_ai_medium_solution(query)
+    
+    async def _generate_ai_medium_solution(self, query: str) -> str:
+        """Generate complete medium-length AI solution"""
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-2.5-flash",
+                google_api_key=os.getenv("GOOGLE_API_KEY"),
+                temperature=0.2,
+                max_output_tokens=800
+            )
+            
+            prompt = f"""You are a math professor. Provide a COMPLETE medium-length solution to this mathematical problem:
+
+Problem: {query}
+
+Requirements:
+1. COMPLETE solution (not partial or cut off)
+2. Medium length (comprehensive but not too verbose)
+3. Step-by-step explanation
+4. Clear final answer
+5. Educational and easy to understand
+
+Format:
+**Problem:** [restate the problem clearly]
+**Solution:**
+Step 1: [detailed first step]
+Step 2: [detailed second step]
+...
+**Answer:** [clear final answer]
+
+Provide a COMPLETE solution that fully addresses the problem."""
+            
+            response = await llm.ainvoke(prompt)
+            solution = response.content if hasattr(response, 'content') else str(response)
+            
+            return solution if solution else f"**Problem:** {query}\n\n**Solution:** Unable to generate complete solution at this time."
+            
+        except Exception as e:
+            logger.error(f"AI solution generation failed: {e}")
+            return f"**Problem:** {query}\n\n**Solution:** Unable to generate solution due to technical issues."
+    
+    async def _cache_web_result(self, query: str, solution: str, result: Dict[str, Any]):
+        """Cache web search result asynchronously"""
+        try:
+            await mongodb_service.store_web_search_cache(
+                query,
+                solution,
+                result.get("references", []),
+                result.get("confidence", 0.7)
+            )
+            logger.info("✅ Cached web search result")
+        except Exception as e:
+            logger.warning(f"Failed to cache web result: {e}")
     
     def _format_error_response(self, query: str, response_time: float, error: str) -> Dict[str, Any]:
         """Format error response"""

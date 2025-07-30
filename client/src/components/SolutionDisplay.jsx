@@ -1,7 +1,7 @@
 import { FileText, Globe, Database, Cpu, MessageSquare } from './Icons';
 import MathSolutionRenderer from './MathSolutionRenderer';
 
-export default function SolutionDisplay({ solution, onFeedbackClick }) {
+export default function SolutionDisplay({ solution, onFeedbackClick, streamingUpdates }) {
     const getSourceIcon = (source) => {
       switch (source) {
         case 'pdf_upload':
@@ -55,6 +55,19 @@ export default function SolutionDisplay({ solution, onFeedbackClick }) {
 
     return (
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        {/* Streaming updates */}
+        {streamingUpdates && (
+          <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <div className="animate-pulse h-2 w-2 bg-blue-500 rounded-full"></div>
+              <span className="text-sm font-medium text-blue-700">Processing...</span>
+            </div>
+            <pre className="whitespace-pre-wrap text-sm text-blue-700 bg-blue-100 rounded-lg p-3">
+              {streamingUpdates}
+            </pre>
+          </div>
+        )}
+
         {/* Header with source info */}
         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">

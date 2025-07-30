@@ -10,6 +10,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain_google_genai import ChatGoogleGenerativeAI
+from services.caching_service import cached
 
 # Import our modular components
 from .vector_store_manager import VectorStoreManager
@@ -50,7 +51,7 @@ class KnowledgeBaseService:
         
         # Initialize LLM for contextual compression
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash", 
+            model="gemini-2.5-flash", 
             google_api_key=os.getenv("GOOGLE_API_KEY")
         )
         
@@ -61,8 +62,12 @@ class KnowledgeBaseService:
         self.pc = self.vector_manager.pc
     
     def _initialize_vector_store(self):
-        """Initialize the main knowledge base vector store"""
+        """Initialize the main knowledge base vector store with adaptive chunking"""
         try:
+            # Import adaptive chunking service
+            from .adaptive_chunking import AdaptiveChunkingService
+            self.chunking_service = AdaptiveChunkingService()
+            
             # Create sample data if file doesn't exist
             if not os.path.exists(self.math_data_file):
                 self.sample_generator.create_sample_math_data(self.math_data_file)
@@ -83,9 +88,8 @@ class KnowledgeBaseService:
                 }
                 documents.append(Document(page_content=content, metadata=metadata))
             
-            # Split documents if needed
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-            split_documents = text_splitter.split_documents(documents)
+            # Use adaptive chunking to split documents
+            split_documents = self.chunking_service.chunk_documents(documents, "math_problem")
             
             # Create vector store
             self.vector_store = self.vector_manager.create_vector_store(
@@ -103,7 +107,7 @@ class KnowledgeBaseService:
             self.vector_store = None
     
     def _initialize_jee_bench(self):
-        """Initialize JEE Bench dataset vector store"""
+        """Initialize JEE Bench dataset vector store with adaptive chunking"""
         try:
             # Check if we need to load JEE Bench data
             existing_store = self.vector_manager.create_vector_store(self.jee_index_name)
@@ -118,6 +122,9 @@ class KnowledgeBaseService:
                     documents = self.jee_loader.load_jee_bench_data()
                     
                     if documents:
+                        # Use adaptive chunking to split documents
+                        documents = self.chunking_service.chunk_documents(documents, "math_problem")
+                        
                         # Add documents in batches
                         batch_size = 50
                         for i in range(0, len(documents), batch_size):
@@ -140,10 +147,18 @@ class KnowledgeBaseService:
             logger.error(f"Error initializing JEE Bench: {e}")
             self.jee_vector_store = None
     
+    @cached(prefix="kb_query", ttl=3600)  # Cache for 1 hour
     async def query(self, query: str) -> Dict[str, Any]:
-        """Query the knowledge base for a mathematical problem"""
+        """Query the knowledge base for a mathematical problem with caching and adaptive chunking"""
         try:
+            # Import performance monitor
+            from .performance_monitor import PerformanceMonitor
+            performance_monitor = PerformanceMonitor()
+            request_id = f"kb_query_{hash(query)}"
+            performance_monitor.start_request(request_id, "knowledge_base_query", query)
+            
             if not self.vector_store:
+                performance_monitor.end_request(request_id)
                 return {"found": False}
             
             # Create retriever with compression for better results
@@ -154,12 +169,16 @@ class KnowledgeBaseService:
             )
             
             # Retrieve relevant documents
+            performance_monitor.log_stage(request_id, "retrieval_start")
             docs = compression_retriever.get_relevant_documents(query)
+            performance_monitor.log_stage(request_id, "retrieval_complete")
             
             if not docs:
+                performance_monitor.end_request(request_id)
                 return {"found": False}
             
             # Calculate similarity score
+            performance_monitor.log_stage(request_id, "similarity_calculation_start")
             query_embedding = self.vector_manager.embeddings.embed_query(query)
             best_doc = None
             best_score = -1
@@ -171,9 +190,11 @@ class KnowledgeBaseService:
                 if similarity > best_score:
                     best_score = similarity
                     best_doc = doc
+            performance_monitor.log_stage(request_id, "similarity_calculation_complete")
             
             # Check if similarity is high enough
             if best_score < 0.75:
+                performance_monitor.end_request(request_id)
                 return {"found": False}
             
             # Extract problem and solution
@@ -181,11 +202,13 @@ class KnowledgeBaseService:
             parts = content.split("Solution:", 1)
             
             if len(parts) < 2:
+                performance_monitor.end_request(request_id)
                 return {"found": False}
             
             problem = parts[0].replace("Problem:", "").strip()
             solution = parts[1].strip()
             
+            performance_monitor.end_request(request_id)
             return {
                 "found": True,
                 "problem": problem,
@@ -197,25 +220,39 @@ class KnowledgeBaseService:
         
         except Exception as e:
             logger.error(f"Error querying knowledge base: {e}")
+            performance_monitor.end_request(request_id, error=str(e))
             return {"found": False}
     
+    @cached(prefix="jee_query", ttl=3600)  # Cache for 1 hour
     async def query_jee_bench(self, query: str) -> Dict[str, Any]:
-        """Query the JEE Bench dataset"""
+        """Query the JEE Bench dataset with caching and performance monitoring"""
         try:
+            # Import performance monitor
+            from .performance_monitor import PerformanceMonitor
+            performance_monitor = PerformanceMonitor()
+            request_id = f"jee_query_{hash(query)}"
+            performance_monitor.start_request(request_id, "jee_bench_query", query)
+            
             if not self.jee_vector_store:
+                performance_monitor.end_request(request_id)
                 return {"found": False}
             
             # Classify query and get appropriate threshold
+            performance_monitor.log_stage(request_id, "query_classification_start")
             query_type = self.query_processor.classify_query(query)
             threshold = self.query_processor.get_adaptive_threshold(query_type)
+            performance_monitor.log_stage(request_id, "query_classification_complete")
             
             # Expand query for better matching
+            performance_monitor.log_stage(request_id, "query_expansion_start")
             expanded_queries = self.query_processor.expand_query(query)
+            performance_monitor.log_stage(request_id, "query_expansion_complete")
             
             best_result = None
             best_score = 0
             
             # Try each expanded query
+            performance_monitor.log_stage(request_id, "retrieval_start")
             for expanded_query in expanded_queries:
                 try:
                     # Search with higher k for better results
@@ -233,6 +270,7 @@ class KnowledgeBaseService:
                 except Exception as e:
                     logger.warning(f"Error searching with query '{expanded_query}': {e}")
                     continue
+            performance_monitor.log_stage(request_id, "retrieval_complete")
             
             if best_result and best_score >= threshold:
                 # Extract problem and solution
@@ -243,6 +281,7 @@ class KnowledgeBaseService:
                     problem = parts[0].replace("Problem:", "").strip()
                     solution = parts[1].strip()
                     
+                    performance_monitor.end_request(request_id)
                     return {
                         "found": True,
                         "problem": problem,
@@ -252,10 +291,12 @@ class KnowledgeBaseService:
                         "references": [f"JEE Bench: {best_result.metadata.get('category', 'Mathematics')}"]
                     }
             
+            performance_monitor.end_request(request_id)
             return {"found": False}
             
         except Exception as e:
             logger.error(f"Error querying JEE Bench: {e}")
+            performance_monitor.end_request(request_id, error=str(e))
             return {"found": False}
     
     async def generate_assignment(self, topic: str, difficulty: str = "Medium", num_problems: int = 5) -> Dict[str, Any]:

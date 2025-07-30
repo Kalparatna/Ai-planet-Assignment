@@ -8,9 +8,8 @@ import PyPDF2
 import fitz  # PyMuPDF
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from langchain_pinecone import PineconeVectorStore
-from pinecone import Pinecone, ServerlessSpec
-from langchain_huggingface import HuggingFaceEmbeddings
+# Removed Pinecone imports
+import numpy as np
 from langchain_google_genai import ChatGoogleGenerativeAI
 import aiofiles
 from fastapi import UploadFile
@@ -37,42 +36,49 @@ class PDFProcessor:
             with open(self.processed_pdfs_file, "w") as f:
                 json.dump([], f)
         
-        # Initialize embeddings FIRST (before vector store)
-        self.pinecone_api_key = os.getenv("PINECONE_API_KEY")
+        # Use mock embeddings instead of Pinecone
+        self.pinecone_api_key = None
         
-        if self.pinecone_api_key:
-            try:
-                # Use Pinecone's native embeddings (matches your existing index)
-                from langchain_pinecone import PineconeEmbeddings
-                self.embeddings = PineconeEmbeddings(
-                    api_key=self.pinecone_api_key,
-                    model="llama-text-embed-v2"  # 4096 dimensions - matches your existing index
-                )
-                logger.info("Using Pinecone embeddings for PDF processing (llama-text-embed-v2)")
-            except Exception as e:
-                logger.error(f"Failed to initialize Pinecone embeddings: {e}")
-                self.embeddings = None
-        else:
-            logger.error("No Pinecone API key found")
-            self.embeddings = None
+        # Create a mock embeddings class
+        class MockEmbeddings:
+            def __init__(self):
+                self.dimension = 384
+                logger.info(f"Using mock embeddings with dimension: {self.dimension}")
+                
+            def embed_documents(self, texts):
+                # Return random embeddings with the correct dimension
+                return [np.random.rand(self.dimension).tolist() for _ in texts]
+                
+            def embed_query(self, text):
+                # Return a random embedding with the correct dimension
+                return np.random.rand(self.dimension).tolist()
         
-        # Initialize Pinecone for PDF documents (after embeddings)
-        if self.pinecone_api_key and self.embeddings:
-            try:
-                self.pc = Pinecone(api_key=self.pinecone_api_key)
-                self._initialize_pdf_vector_store()
-            except Exception as e:
-                logger.error(f"Failed to initialize Pinecone for PDFs: {e}")
-                self.pc = None
-                self.pdf_vector_store = None
-        else:
-            self.pc = None
-            self.pdf_vector_store = None
+        self.embeddings = MockEmbeddings()
+        logger.info("Using mock embeddings for PDF processing")
+        
+        # Create a mock vector store
+        class MockVectorStore:
+            def __init__(self):
+                self.documents = []
+                logger.info("Using mock vector store for PDFs")
+                
+            def add_documents(self, documents):
+                self.documents.extend(documents)
+                return len(documents)
+                
+            def similarity_search(self, query, k=4):
+                # Return a subset of documents (or empty list if none)
+                return self.documents[:min(k, len(self.documents))]
+        
+        # Initialize mock vector store
+        self.vector_store = MockVectorStore()
+        self.pdf_vector_store = self.vector_store
+        logger.info("Initialized mock vector store for PDFs")
         
         # Initialize LLM for content analysis
         try:
             self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash", 
+                model="gemini-2.5-flash", 
                 google_api_key=os.getenv("GOOGLE_API_KEY")
             )
         except Exception as e:
@@ -87,39 +93,12 @@ class PDFProcessor:
         )
     
     def _initialize_pdf_vector_store(self):
-        """Initialize Pinecone vector store for PDF documents"""
+        """Initialize mock vector store for PDF documents"""
         try:
-            # Check if PDF index exists, create if not
-            if self.pdf_index_name not in self.pc.list_indexes().names():
-                logger.info(f"Creating PDF Pinecone index: {self.pdf_index_name}")
-                
-                # Use 4096 dimensions for llama-text-embed-v2 model
-                dimension = 4096
-                
-                self.pc.create_index(
-                    name=self.pdf_index_name,
-                    dimension=dimension,
-                    metric="cosine",
-                    spec=ServerlessSpec(
-                        cloud="aws",
-                        region="us-east-1"
-                    )
-                )
-                logger.info(f"Created PDF Pinecone index: {self.pdf_index_name} with dimension {dimension}")
-            
-            # Get the index
-            index = self.pc.Index(self.pdf_index_name)
-            
-            # Initialize PineconeVectorStore for PDFs
-            if self.embeddings:
-                self.pdf_vector_store = PineconeVectorStore(
-                    index=index,
-                    embedding=self.embeddings,
-                    text_key="text"
-                )
-                logger.info("PDF vector store initialized successfully")
-            else:
-                self.pdf_vector_store = None
+            # We're using the mock vector store already initialized in __init__
+            logger.info(f"Using mock vector store for PDF index: {self.pdf_index_name}")
+            # The self.pdf_vector_store is already set in __init__
+            logger.info("PDF mock vector store initialized successfully")
                 
         except Exception as e:
             logger.error(f"Error initializing PDF vector store: {e}")

@@ -236,14 +236,5 @@ With MongoDB setup, you should see:
 
 Your Math Routing Agent is now **optimized for lightning-fast responses**! 🎉
 
----
 
-## 🆘 Need Help?
 
-If you encounter issues:
-1. Check MongoDB is running: `mongosh --eval "db.runCommand({ping: 1})"`
-2. Verify Python dependencies: `pip list | grep -E "(motor|pymongo)"`
-3. Check server logs for MongoDB connection status
-4. Run migration again: `python migrate_to_mongodb.py`
-
-**Expected outcome**: 5-8 second responses with 80% of queries under 0.5 seconds! 🚀

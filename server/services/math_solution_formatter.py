@@ -30,7 +30,7 @@ class MathSolverService:
         # Initialize LLM
         try:
             self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 google_api_key=self.google_api_key,
                 temperature=0.2,
                 top_p=0.95,

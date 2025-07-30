@@ -48,7 +48,7 @@ class FeedbackService:
         # Initialize LLM for solution improvement (fallback from DSPy)
         try:
             self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 google_api_key=os.getenv("GOOGLE_API_KEY"),
                 temperature=0.3
             )
@@ -66,7 +66,7 @@ class FeedbackService:
             try:
                 self.dspy_model = MathSolutionModule()
                 # Set up DSPy with appropriate LLM
-                dspy.settings.configure(lm=dspy.Gemini2(model="gemini-2.0-flash"))
+                dspy.settings.configure(lm=dspy.Gemini2(model="gemini-2.5-flash"))
                 self.dspy_initialized = True
             except Exception as e:
                 logger.error(f"Error initializing DSPy: {e}")

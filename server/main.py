@@ -8,6 +8,7 @@ import json
 import uvicorn
 from dotenv import load_dotenv
 import logging
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -31,6 +32,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize performance monitoring
+from services.performance_monitor import PerformanceMonitor
+performance_monitor = PerformanceMonitor()
+
+# Add performance monitoring middleware
+@app.middleware("http")
+async def performance_monitoring_middleware(request: Request, call_next):
+    # Generate a unique request ID
+    import uuid
+    request_id = str(uuid.uuid4())
+    
+    # Get endpoint path
+    endpoint = request.url.path
+    
+    try:
+        # Start timing the request
+        performance_monitor.start_request(request_id, endpoint)
+        
+        # Process the request
+        response = await call_next(request)
+        
+        # End timing and log performance metrics
+        performance_monitor.end_request(request_id)
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error in middleware: {e}")
+        # Still end the performance monitoring in case of error
+        if request_id in performance_monitor.current_requests:
+            performance_monitor.end_request(request_id, success=False)
+        raise
 
 # Import modules after app initialization
 from routes import math_router

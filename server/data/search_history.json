@@ -214,5 +214,17 @@
       "https://gmatclub.com/forum/an-instrument-store-gives-a-10-discount-to-all-students-off-the-428401.html"
     ],
     "timestamp": "2025-07-30T22:13:13.327551"
+  },
+  {
+    "query": "An instrument store gives a 10% discount to all students off the original cost of an instrument. During a back to school sale an additional 15% is taken off the discounted price. Julie, a student at the local high school, purchases a flute for $306. How much did it originally cost?",
+    "solution": "Problem: An instrument store gives a 10% discount to all students off the original cost of an instrument. During a back to school sale an additional 15% is taken off the discounted price. Julie, a student at the local high school, purchases a flute for $306. How much did it originally cost?\n\n**Problem Statement:**\n\nAn instrument store offers a 10% discount to all students on the original price of an instrument. During a back-to-school sale, an additional 15% discount is applied to the already discounted price. Julie, a student, purchases a flute for $306. What was the original price of the flute?\n\n**Solution:**\n\n1.  **Define the variable:**\n\n    Let *x* represent the original price of the flute.\n\n2.  **Calculate the price after the student discount:**\n\n    A 10% discount means Julie pays 90% of the original price.  This can be written as:\n\n    0.  9 * x\n\n3.  **Calculate the price after the back-to-school discount:**\n\n    An additional 15% discount is applied to the discounted price (0.9*x). This means Julie pays 85% of the discounted price. This can be written as:\n\n    1.  85 * (0.9 * x)\n\n4.  **Set up the equation:**\n\n    We know that the final price Julie paid is $306.  Therefore:\n\n    1.  85 * (0.9 * x) = 306\n\n5.  **Simplify the equation:**\n\n    Multiply the decimals:\n\n    1.  765 * x = 306\n\n6.  **Solve for x:**\n\n    Divide both sides of the equation by 0.765:\n\n    x = 306 / 0.765\n\n    x = 400\n\n**Answer:**\n\nThe original price of the flute was $400.\n\n**Explanation of Mathematical Concepts:**\n\n*   **Percentage Discounts:**  A percentage discount reduces the original price by a certain percentage. To calculate the price after a discount, you can multiply the original price by (1 - discount percentage as a decimal). For example, a 10% discount means you pay 1 - 0.10 = 0.90 or 90% of the original price.\n*   **Consecutive Discounts:** When multiple discounts are applied, each discount is applied to the price resulting from the previous discount, not the original price.\n*   **Algebraic Equations:**  We use an algebraic equation to represent the problem mathematically and solve for the unknown variable (the original price).",
+    "references": [
+      "https://www.wyzant.com/resources/answers/107871/an_instrument_store_gives_10_discount_to_all_students_off_the_original_cost_of_instrument_during_back_to_school_sale_on",
+      "https://mathematics11.quora.com/A-store-gives-a-10-discount-to-all-students-off-the-original-cost-of-an-item-During-a-back-to-school-sale-an-another-1",
+      "http://www.algebra.com/algebra/homework/percentage/percentage.faq.question.252905.html",
+      "https://www.wyzant.com/resources/answers/107589/an_instrument_store_gives_10_discount_to_all_students",
+      "https://gmatclub.com/forum/an-instrument-store-gives-a-10-discount-to-all-students-off-the-428401.html"
+    ],
+    "timestamp": "2025-07-30T22:26:44.833145"
   }
 ]

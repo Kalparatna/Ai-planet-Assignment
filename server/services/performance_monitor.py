@@ -49,7 +49,7 @@ class PerformanceMonitor:
             logger.info(f"Request {request_id[:8]} - {stage}: {duration:.2f}s")
     
     def end_request(self, request_id: str, success: bool = True, 
-                   source: str = "unknown", confidence: float = 0.0) -> None:
+                   source: str = "unknown", confidence: float = 0.0, error: str = None) -> None:
         """End tracking a request and save metrics"""
         if request_id not in self.current_requests:
             return
@@ -67,6 +67,7 @@ class PerformanceMonitor:
             "success": success,
             "source": source,
             "confidence": confidence,
+            "error": error,
             "timestamp": datetime.now().isoformat()
         }
         

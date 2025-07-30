@@ -8,6 +8,7 @@ import re
 import logging
 from typing import Dict, Any, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
+from services.caching_service import cached
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 class ImprovedMathSolver:
     def __init__(self):
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash", 
+            model="gemini-2.5-flash", 
             google_api_key=os.getenv("GOOGLE_API_KEY")
         )
     
@@ -74,8 +75,15 @@ class ImprovedMathSolver:
         
         return False
     
+    @cached(prefix="arithmetic_solve", ttl=7200)  # Cache for 2 hours
     async def solve_simple_arithmetic(self, query: str) -> Dict[str, Any]:
-        """Solve simple arithmetic problems with step-by-step solutions"""
+        """Solve simple arithmetic problems with step-by-step solutions using caching and streaming"""
+        # Import performance monitor
+        from .performance_monitor import PerformanceMonitor
+        performance_monitor = PerformanceMonitor()
+        request_id = f"arithmetic_{hash(query)}"
+        performance_monitor.start_request(request_id, "arithmetic_solve", query)
+        
         try:
             prompt = f"""
             Solve this simple arithmetic problem step by step:
@@ -90,9 +98,19 @@ class ImprovedMathSolver:
             Format your response as a complete mathematical solution.
             """
             
-            response = await self.llm.ainvoke(prompt)
-            solution = response.content if hasattr(response, 'content') else str(response)
+            # Get streaming service for token-by-token generation
+            from .streaming_service import StreamingService
+            streaming_service = StreamingService()
             
+            # Configure LLM for streaming
+            streaming_llm = streaming_service.configure_llm_for_streaming(self.llm)
+            
+            # Generate solution with streaming
+            performance_monitor.log_stage(request_id, "llm_generation_start")
+            solution = await streaming_service.stream_llm_response(prompt=prompt, llm=streaming_llm)
+            performance_monitor.log_stage(request_id, "llm_generation_complete")
+            
+            performance_monitor.end_request(request_id)
             return {
                 "found": True,
                 "solution": solution,
@@ -103,10 +121,14 @@ class ImprovedMathSolver:
             
         except Exception as e:
             logger.error(f"Error solving simple arithmetic: {e}")
-            return {"found": False}
+            performance_monitor.end_request(request_id, error=str(e))
+            return {"found": False, "error": str(e)}
     
     async def solve_basic_geometry(self, query: str) -> Dict[str, Any]:
         """Solve basic geometry problems with formulas and step-by-step solutions"""
+        request_id = f"geometry_{hash(query)}"
+        self.performance_monitor.start_request(request_id, "solve_basic_geometry", query)
+        
         try:
             prompt = f"""
             Solve this geometry problem step by step using the appropriate formula:
@@ -122,9 +144,20 @@ class ImprovedMathSolver:
             Format your response as a complete mathematical solution.
             """
             
-            response = await self.llm.ainvoke(prompt)
-            solution = response.content if hasattr(response, 'content') else str(response)
+            # Get streaming service for token-by-token generation
+            from .streaming_service import StreamingService
+            streaming_service = StreamingService()
             
+            # Configure LLM for streaming
+            self.performance_monitor.log_stage(request_id, "configure_llm")
+            streaming_llm = streaming_service.configure_llm_for_streaming(self.llm)
+            
+            # Generate solution with streaming
+            self.performance_monitor.log_stage(request_id, "llm_generation_start")
+            solution = await streaming_service.stream_llm_response(prompt=prompt, llm=streaming_llm)
+            self.performance_monitor.log_stage(request_id, "llm_generation_complete")
+            
+            self.performance_monitor.end_request(request_id)
             return {
                 "found": True,
                 "solution": solution,
@@ -135,10 +168,14 @@ class ImprovedMathSolver:
             
         except Exception as e:
             logger.error(f"Error solving basic geometry: {e}")
+            self.performance_monitor.end_request(request_id, error=str(e))
             return {"found": False}
     
     async def solve_simple_derivative(self, query: str) -> Dict[str, Any]:
         """Solve simple derivative problems with step-by-step solutions"""
+        request_id = f"derivative_{hash(query)}"
+        self.performance_monitor.start_request(request_id, "solve_simple_derivative", query)
+        
         try:
             prompt = f"""
             Find the derivative step by step:
@@ -154,9 +191,20 @@ class ImprovedMathSolver:
             Format your response as a complete calculus solution.
             """
             
-            response = await self.llm.ainvoke(prompt)
-            solution = response.content if hasattr(response, 'content') else str(response)
+            # Get streaming service for token-by-token generation
+            from .streaming_service import StreamingService
+            streaming_service = StreamingService()
             
+            # Configure LLM for streaming
+            self.performance_monitor.log_stage(request_id, "configure_llm")
+            streaming_llm = streaming_service.configure_llm_for_streaming(self.llm)
+            
+            # Generate solution with streaming
+            self.performance_monitor.log_stage(request_id, "llm_generation_start")
+            solution = await streaming_service.stream_llm_response(prompt=prompt, llm=streaming_llm)
+            self.performance_monitor.log_stage(request_id, "llm_generation_complete")
+            
+            self.performance_monitor.end_request(request_id)
             return {
                 "found": True,
                 "solution": solution,
@@ -167,6 +215,7 @@ class ImprovedMathSolver:
             
         except Exception as e:
             logger.error(f"Error solving simple derivative: {e}")
+            self.performance_monitor.end_request(request_id, error=str(e))
             return {"found": False}
     
     def should_use_jee_bench(self, query: str) -> bool:
@@ -192,6 +241,9 @@ class ImprovedMathSolver:
     
     async def generate_comprehensive_solution(self, query: str) -> Dict[str, Any]:
         """Generate a comprehensive solution for complex problems"""
+        request_id = f"comprehensive_{hash(query)}"
+        self.performance_monitor.start_request(request_id, "generate_comprehensive_solution", query)
+        
         try:
             prompt = f"""
             Provide a comprehensive step-by-step solution for this mathematical problem:
@@ -209,9 +261,20 @@ class ImprovedMathSolver:
             Format your response as a complete educational solution that a student can follow and understand.
             """
             
-            response = await self.llm.ainvoke(prompt)
-            solution = response.content if hasattr(response, 'content') else str(response)
+            # Get streaming service for token-by-token generation
+            from .streaming_service import StreamingService
+            streaming_service = StreamingService()
             
+            # Configure LLM for streaming
+            self.performance_monitor.log_stage(request_id, "configure_llm")
+            streaming_llm = streaming_service.configure_llm_for_streaming(self.llm)
+            
+            # Generate solution with streaming
+            self.performance_monitor.log_stage(request_id, "llm_generation_start")
+            solution = await streaming_service.stream_llm_response(prompt=prompt, llm=streaming_llm)
+            self.performance_monitor.log_stage(request_id, "llm_generation_complete")
+            
+            self.performance_monitor.end_request(request_id)
             return {
                 "found": True,
                 "solution": solution,
@@ -222,6 +285,7 @@ class ImprovedMathSolver:
             
         except Exception as e:
             logger.error(f"Error generating comprehensive solution: {e}")
+            self.performance_monitor.end_request(request_id, error=str(e))
             return {"found": False}
 
 # Test the improved solver

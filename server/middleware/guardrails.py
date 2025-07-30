@@ -15,7 +15,7 @@ class AIGatewayGuardrails:
     
     def __init__(self):
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             google_api_key=os.getenv("GOOGLE_API_KEY")
         )
         

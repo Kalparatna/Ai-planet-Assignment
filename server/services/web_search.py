@@ -1,12 +1,16 @@
+#!/usr/bin/env python3
+"""
+Web Search Service - ENHANCED
+Complete medium-length solutions with proper source attribution
+"""
+
 import os
-import json
+import asyncio
 import logging
-from typing import Dict, Any, List, Optional, Union
-import requests
-from bs4 import BeautifulSoup
 import re
+from typing import Dict, Any, List
 from dotenv import load_dotenv
-from tenacity import retry, stop_after_attempt, wait_exponential
+from .connection_manager import connection_manager
 
 # Load environment variables
 load_dotenv()
@@ -16,310 +20,222 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class WebSearchService:
+    """Enhanced Web Search - Complete solutions with clean source attribution"""
+    
     def __init__(self):
         self.tavily_api_key = os.getenv("TAVILY_API_KEY")
-        self.google_api_key = os.getenv("GOOGLE_API_KEY")
-        self.search_history_file = "data/search_history.json"
         
-        # Create directories if they don't exist
-        os.makedirs("data", exist_ok=True)
-        
-        # Initialize search history
-        if not os.path.exists(self.search_history_file):
-            with open(self.search_history_file, "w") as f:
-                json.dump([], f)
-        
-        # Initialize Gemini for content formatting
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                google_api_key=self.google_api_key,
-                temperature=0.2,
-                top_p=0.95,
-                top_k=40,
-                max_output_tokens=2048,
-            )
-            logger.info("Gemini initialized for web search content formatting")
-        except Exception as e:
-            logger.error(f"Failed to initialize Gemini: {e}")
-            self.llm = None
-    
-    async def search(self, query: str) -> Dict[str, Any]:
-        """Search the web for mathematical problems and solutions"""
-        try:
-            # First try Tavily API for specialized search
-            tavily_result = await self._search_tavily(query)
-            
-            if tavily_result and tavily_result.get("found", False):
-                return tavily_result
-            
-            # If Tavily fails or doesn't find good results, try direct web scraping
-            scrape_result = await self._scrape_math_sites(query)
-            
-            if scrape_result and scrape_result.get("found", False):
-                return scrape_result
-            
-            # If all else fails, return not found
-            return {"found": False}
-        
-        except Exception as e:
-            logger.error(f"Error in web search: {e}")
-            return {"found": False}
-    
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    async def _search_tavily(self, query: str) -> Dict[str, Any]:
-        """Search using Tavily API for specialized search"""
+    async def search(self, query: str, timeout: float = 6.5) -> Dict[str, Any]:
+        """
+        Enhanced search with complete medium-length solutions
+        Args:
+            query: The search query
+            timeout: Maximum time in seconds to wait for response (default: 6.5)
+        Returns:
+            Dict containing search results or fallback response
+        """
         try:
             if not self.tavily_api_key:
-                logger.warning("Tavily API key not found")
-                return {"found": False}
+                logger.warning("❌ Tavily API key not found")
+                return await self._generate_ai_fallback_solution(query)
             
-            # Enhance query for mathematical context
-            enhanced_query = f"mathematical problem solution step by step: {query}"
+            logger.info(f"🌐 Web search: {query[:50]}...")
             
-            # Call Tavily API with correct format
+            # Enhanced payload for comprehensive math solutions
             payload = {
                 "api_key": self.tavily_api_key,
-                "query": enhanced_query,
-                "search_depth": "advanced",
+                "query": f"complete step by step mathematical solution: {query}",
+                "search_depth": "basic",
                 "include_domains": [
-                    "khanacademy.org", "mathsisfun.com", "purplemath.com", 
-                    "mathworld.wolfram.com", "brilliant.org", "mathway.com",
-                    "symbolab.com", "socratic.org", "chegg.com", "mathsgenie.co.uk"
+                    "mathsisfun.com",
+                    "khanacademy.org",
+                    "chegg.com",
+                    "symbolab.com",
+                    "mathway.com",
+                    "wolframalpha.com"
                 ],
-                "max_results": 5,
+                "max_results": 3,  # Exactly 3 results as requested
                 "include_answer": True,
-                "include_raw_content": True
+                "include_raw_content": True  # Need content for complete solutions
             }
             
-            response = requests.post(
-                "https://api.tavily.com/search",
-                headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=30
-            )
+            # Make API call with configurable timeout
+            # Make API call with configurable timeout
+            try:
+                result = await asyncio.wait_for(
+                    connection_manager.post_json(
+                        "https://api.tavily.com/search",
+                        payload
+                    ),
+                    timeout=timeout
+                )
+
+                if result and "results" in result and result["results"]:
+                    # Process results for complete medium-length solution
+                    combined_content = ""
+                    source_names = []
+
+                    for i, item in enumerate(result["results"][:3]):  # Max 3 sources
+                        item_content = item.get("content", "")
+                        if item_content and len(item_content) > 50:
+                            combined_content += item_content + " "
+                            # Extract clean source name from URL
+                            source_name = self._extract_source_name(item.get("url", ""))
+                            source_names.append(source_name)
+
+                    if combined_content:
+                        # Create complete medium-length solution
+                        complete_solution = self._create_complete_solution(combined_content, query)
+
+                        return {
+                            "found": True,
+                            "solution": complete_solution,
+                            "confidence": 0.8,
+                            "references": source_names[:3]  # Clean source names only
+                        }
+
+            except Exception as e:
+                logger.info("❌ No valid results from web search, generating AI solution")
+                return await self._generate_ai_fallback_solution(query)
+
             
-            if response.status_code != 200:
-                logger.error(f"Tavily API error: {response.status_code} - {response.text}")
-                return {"found": False}
-            
-            result = response.json()
-            
-            # Process and extract solution
-            if result and "results" in result and len(result["results"]) > 0:
-                # Extract content from results
-                content = ""
-                references = []
-                
-                for item in result["results"]:
-                    content += item.get("content", "") + "\n\n"
-                    references.append(item.get("url", ""))
-                
-                # Extract mathematical solution
-                solution = await self._extract_math_solution(content, query)
-                
-                if solution:
-                    # Save search history
-                    self._save_search_history(query, solution, references)
-                    
-                    return {
-                        "found": True,
-                        "solution": solution,
-                        "confidence": 0.85,
-                        "references": references
-                    }
-            
-            return {"found": False}
-        
+        except asyncio.TimeoutError:
+            logger.warning("⏰ Web search timed out, generating AI solution")
+            return await self._generate_ai_fallback_solution(query)
         except Exception as e:
-            logger.error(f"Error in Tavily search: {e}")
-            return {"found": False}
+            logger.error(f"❌ Web search error: {e}, generating AI solution")
+            return await self._generate_ai_fallback_solution(query)
     
-    async def _scrape_math_sites(self, query: str) -> Dict[str, Any]:
-        """Scrape popular math websites for solutions"""
+    def _create_complete_solution(self, content: str, query: str) -> str:
+        """Create complete medium-length solution from web content"""
         try:
-            # List of math websites to scrape
-            math_sites = [
-                f"https://www.mathway.com/Algebra?problem={query}",
-                f"https://www.wolframalpha.com/input?i={query}",
-                f"https://www.symbolab.com/solver?or=goog&query={query}"
+            # Clean and normalize content
+            clean_content = re.sub(r'\s+', ' ', content).strip()
+            
+            # Remove web garbage and navigation elements
+            garbage_patterns = [
+                r'cookie\s+policy.*?(?=\.|$)',
+                r'privacy.*?(?=\.|$)',
+                r'advertisement.*?(?=\.|$)',
+                r'subscribe.*?(?=\.|$)',
+                r'login.*?(?=\.|$)',
+                r'menu.*?(?=\.|$)',
+                r'navigation.*?(?=\.|$)',
+                r'footer.*?(?=\.|$)',
+                r'header.*?(?=\.|$)',
+                r'sidebar.*?(?=\.|$)'
             ]
             
-            for site in math_sites:
-                try:
-                    response = requests.get(
-                        site,
-                        headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-                        },
-                        timeout=10
-                    )
+            for pattern in garbage_patterns:
+                clean_content = re.sub(pattern, '', clean_content, flags=re.IGNORECASE)
+            
+            # Extract mathematical content with better filtering
+            math_content = []
+            sentences = clean_content.split('.')
+            
+            for sentence in sentences:
+                sentence = sentence.strip()
+                if len(sentence) > 15:
+                    # Check for mathematical indicators
+                    math_indicators = [
+                        '=', 'formula', 'step', 'solve', 'answer', 'calculate', 
+                        'solution', 'method', 'approach', 'theorem', 'rule',
+                        '+', '-', '×', '÷', '²', '³', '√', 'x', 'y', 'z'
+                    ]
                     
-                    if response.status_code == 200:
-                        # Parse HTML
-                        soup = BeautifulSoup(response.text, "html.parser")
-                        
-                        # Extract content based on the site
-                        content = ""
-                        if "mathway.com" in site:
-                            # Extract from Mathway
-                            steps_div = soup.find("div", {"class": "steps"})
-                            if steps_div:
-                                content = steps_div.get_text()
-                        
-                        elif "wolframalpha.com" in site:
-                            # Extract from WolframAlpha
-                            result_divs = soup.find_all("div", {"class": "_9JgWwX8"})
-                            for div in result_divs:
-                                content += div.get_text() + "\n"
-                        
-                        elif "symbolab.com" in site:
-                            # Extract from Symbolab
-                            steps_div = soup.find("div", {"class": "solution-step"})
-                            if steps_div:
-                                content = steps_div.get_text()
-                        
-                        # Extract solution
-                        solution = await self._extract_math_solution(content, query)
-                        
-                        if solution:
-                            # Save search history
-                            self._save_search_history(query, solution, [site])
-                            
-                            return {
-                                "found": True,
-                                "solution": solution,
-                                "confidence": 0.75,
-                                "references": [site]
-                            }
-                
-                except Exception as e:
-                    logger.error(f"Error scraping {site}: {e}")
-                    continue
+                    if any(indicator in sentence.lower() for indicator in math_indicators):
+                        math_content.append(sentence)
             
-            return {"found": False}
-        
-        except Exception as e:
-            logger.error(f"Error in web scraping: {e}")
-            return {"found": False}
-    
-    async def _extract_math_solution(self, content: str, query: str) -> Optional[str]:
-        """Extract and format a mathematical solution from web content using Gemini"""
-        if not content:
-            return None
-        
-        # Clean up the content
-        content = re.sub(r'\s+', ' ', content).strip()
-        
-        # Check if content is substantial enough
-        if len(content) < 50:
-            return None
-        
-        # Use Gemini to format the web search content into a proper mathematical solution
-        if self.llm:
-            try:
-                prompt = f"""
-                You are a mathematical professor. I found some content from web search about a mathematical problem, but it's messy and unstructured. Please format it into a clean, step-by-step mathematical solution.
-
-                Original Question: {query}
-
-                Web Search Content:
-                {content}
-
-                Please provide a clean, educational solution with:
-                1. Clear problem statement
-                2. Step-by-step solution with proper mathematical notation
-                3. Final answer
-                4. Brief explanation of the mathematical concepts used
-
-                Format it as a proper mathematical solution that a student can easily understand. Remove any unnecessary content, advertisements, or irrelevant information. Focus only on the mathematical solution.
-
-                Do not include any references to websites or sources in the solution itself - just provide the clean mathematical content.
-                """
+            # Build complete medium-length solution
+            if math_content:
+                # Take more sentences for complete solution (5-8 sentences)
+                selected_content = math_content[:8]
+                solution_text = '. '.join(selected_content)
                 
-                response = await self.llm.ainvoke(prompt)
+                # Ensure medium length (300-800 characters)
+                if len(solution_text) < 300 and len(clean_content) > 300:
+                    # Add more context if solution is too short
+                    additional_sentences = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 20]
+                    for sentence in additional_sentences:
+                        if sentence not in solution_text:
+                            solution_text += '. ' + sentence
+                            if len(solution_text) >= 300:
+                                break
                 
-                # Extract content from response
-                if hasattr(response, 'content'):
-                    formatted_solution = response.content
-                else:
-                    formatted_solution = str(response)
+                # Trim if too long (keep under 800 characters)
+                if len(solution_text) > 800:
+                    solution_text = solution_text[:797] + "..."
                 
-                # Clean up the formatted solution
-                formatted_solution = formatted_solution.strip()
-                
-                # Ensure it starts with "Problem:" if not already
-                if not formatted_solution.startswith("Problem:"):
-                    formatted_solution = f"Problem: {query}\n\n{formatted_solution}"
-                
-                return formatted_solution
-                
-            except Exception as e:
-                logger.error(f"Error formatting solution with Gemini: {e}")
-                # Fall back to basic formatting if Gemini fails
-                return self._basic_format_solution(content, query)
-        else:
-            # Fall back to basic formatting if Gemini is not available
-            return self._basic_format_solution(content, query)
-    
-    def _basic_format_solution(self, content: str, query: str) -> str:
-        """Basic formatting fallback when Gemini is not available"""
-        solution = f"Problem: {query}\n\n"
-        
-        # Look for step indicators
-        steps = re.findall(r'(Step \d+[:.\s].*?)(?=Step \d+|$)', content, re.IGNORECASE | re.DOTALL)
-        
-        if steps:
-            solution += "Solution:\n\n"
-            for i, step in enumerate(steps, 1):
-                solution += f"Step {i}: {step.strip()}\n\n"
-        else:
-            # If no explicit steps, try to break into logical parts
-            sentences = re.split(r'(?<=[.!?])\s+', content)
-            
-            if len(sentences) > 3:
-                solution += "Solution:\n\n"
-                solution += "Step 1: Understanding the problem\n"
-                solution += sentences[0] + "\n\n"
-                
-                solution += "Step 2: Solution approach\n"
-                solution += " ".join(sentences[1:3]) + "\n\n"
-                
-                solution += "Step 3: Solving\n"
-                solution += " ".join(sentences[3:min(len(sentences), 6)]) + "\n\n"
-                
-                if len(sentences) > 6:
-                    solution += "Step 4: Final answer\n"
-                    solution += " ".join(sentences[6:]) + "\n\n"
+                return solution_text
             else:
-                # Not enough content to structure, just use as is
-                solution += "Solution:\n" + content[:500] + "...\n\n"
-        
-        return solution
-    
-    def _save_search_history(self, query: str, solution: str, references: List[str]) -> None:
-        """Save search history for future reference"""
-        try:
-            with open(self.search_history_file, "r") as f:
-                history = json.load(f)
+                # Fallback: use first meaningful part of content
+                meaningful_content = clean_content[:600] + "..." if len(clean_content) > 600 else clean_content
+                return meaningful_content
             
-            entry = {
-                "query": query,
-                "solution": solution,
-                "references": references,
-                "timestamp": import_datetime().now().isoformat()
+        except Exception as e:
+            logger.error(f"Error creating complete solution: {e}")
+            return content[:400] + "..." if len(content) > 400 else content
+    
+    def _extract_source_name(self, url: str) -> str:
+        """Extract clean source name from URL"""
+        try:
+            if not url:
+                return "Web Source"
+            
+            # Extract domain name
+            domain_match = re.search(r'https?://(?:www\.)?([^/]+)', url)
+            if domain_match:
+                domain = domain_match.group(1)
+                
+                # Clean up common domain patterns
+                domain_mappings = {
+                    'mathsisfun.com': 'Math is Fun',
+                    'khanacademy.org': 'Khan Academy',
+                    'chegg.com': 'Chegg',
+                    'symbolab.com': 'Symbolab',
+                    'mathway.com': 'Mathway',
+                    'wolframalpha.com': 'Wolfram Alpha',
+                    'stackoverflow.com': 'Stack Overflow',
+                    'math.stackexchange.com': 'Math Stack Exchange',
+                    'brilliant.org': 'Brilliant',
+                    'coursera.org': 'Coursera'
+                }
+                
+                return domain_mappings.get(domain, domain.replace('.com', '').replace('.org', '').title())
+            
+            return "Web Source"
+            
+        except Exception as e:
+            logger.error(f"Error extracting source name: {e}")
+            return "Web Source"
+    
+    async def _generate_ai_fallback_solution(self, query: str) -> Dict[str, Any]:
+        """Generate AI solution when web search fails or times out"""
+        try:
+            logger.info("🤖 Generating AI fallback solution...")
+            
+            # Import the AI solver
+            from .specialized_math_solver import ImprovedMathSolver
+            improved_solver = ImprovedMathSolver()
+            
+            # Generate comprehensive solution
+            ai_result = await improved_solver.generate_comprehensive_solution(query)
+            
+            return {
+                "found": True,
+                "solution": ai_result.get("solution", "Unable to generate solution"),
+                "confidence": ai_result.get("confidence", 0.75),
+                "references": ["AI Generated Solution"]
             }
             
-            history.append(entry)
-            
-            with open(self.search_history_file, "w") as f:
-                json.dump(history, f, indent=2)
-        
         except Exception as e:
-            logger.error(f"Error saving search history: {e}")
+            logger.error(f"Error generating AI fallback solution: {e}")
+            return {
+                "found": False,
+                "solution": "Unable to find or generate solution",
+                "confidence": 0.0,
+                "references": []
+            }
 
-# Helper function to import datetime (to avoid circular imports)
-def import_datetime():
-    from datetime import datetime
-    return datetime
+# Global web search service instance
+web_search_service = WebSearchService()

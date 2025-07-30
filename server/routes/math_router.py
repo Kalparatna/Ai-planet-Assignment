@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, Body
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, AsyncGenerator
 import logging
+import asyncio
 
 # Import services
 from services.knowledge_base import KnowledgeBaseService
@@ -41,68 +43,176 @@ def get_services():
         
     return knowledge_base_service, web_search_service, math_solver_service, response_formatter, pdf_processor
 
-# Full search flow function
+# Import new services
+from services.caching_service import CachingService
+from services.caching_service import cached
+from services.adaptive_chunking import AdaptiveChunkingService
+from services.streaming_service import StreamingService
+from services.parallel_executor import ParallelExecutor
+from services.dspy_feedback_loop import DSPyFeedbackService
+
+# Full search flow function with streaming
+async def stream_solution_updates(request: Request, query: str) -> AsyncGenerator[str, None]:
+    """Stream solution updates to the client"""
+    # Get streaming service
+    streaming_service = StreamingService()
+    
+    # Get math solver service
+    from services.specialized_math_solver import ImprovedMathSolver
+    math_solver = ImprovedMathSolver()
+    
+    # Initialize performance monitoring
+    from services.performance_monitor import PerformanceMonitor
+    performance_monitor = PerformanceMonitor()
+    request_id = f"stream_updates_{hash(query)}"
+    performance_monitor.start_request(request_id, "stream_solution_updates", query)
+    
+    try:
+        # Stream the solution
+        performance_monitor.log_stage(request_id, "streaming_start")
+        async for token in streaming_service.stream_math_solution(query, math_solver):
+            yield token
+        performance_monitor.log_stage(request_id, "streaming_complete")
+        performance_monitor.end_request(request_id, True)
+    except Exception as e:
+        logger.error(f"Error in streaming solution updates: {e}")
+        yield f"\nError generating solution: {str(e)}"
+        performance_monitor.end_request(request_id, False, "error", 0.0)
+
+@cached(prefix="full_search_flow", ttl=3600)  # Cache for 1 hour
 async def _full_search_flow(knowledge_base_service, web_search_service, math_solver_service, improved_solver, validated_query):
-    """Execute the full search flow: Knowledge Base → JEE Bench → Web Search → AI Generated"""
+    """Execute parallel search flow with caching and adaptive chunking"""
+    # Initialize parallel executor
+    parallel_executor = ParallelExecutor()
     
-    # Step 1: Check local knowledge base
-    logger.info("Step 1: Searching in local knowledge base...")
-    kb_result = await knowledge_base_service.query(validated_query)
+    # Initialize adaptive chunking service
+    chunking_service = AdaptiveChunkingService()
     
-    if kb_result and kb_result.get("found", False):
-        logger.info("✅ Found in knowledge base")
-        solution = math_solver_service.format_solution(kb_result["solution"], validated_query)
-        return MathResponse(
-            solution=f"**Source: Knowledge Base**\n\n{solution}",
-            source="knowledge_base",
-            confidence=kb_result.get("confidence", 0.85),
-            references=[f"📚 {ref}" for ref in kb_result.get("references", [])]
-        )
+    # Initialize performance monitoring
+    from services.performance_monitor import PerformanceMonitor
+    performance_monitor = PerformanceMonitor()
+    request_id = f"math_query_{hash(validated_query)}"
+    performance_monitor.start_request(request_id, "math_solve", validated_query)
     
-    # Step 2: Check JEE Bench dataset
-    logger.info("Step 2: Searching in JEE Bench dataset...")
-    jee_result = await knowledge_base_service.query_jee_bench(validated_query)
-    
-    if jee_result and jee_result.get("found", False):
-        logger.info("✅ Found in JEE Bench dataset")
-        solution = math_solver_service.format_solution(jee_result["solution"], validated_query)
-        return MathResponse(
-            solution=f"**Source: JEE Bench Dataset**\n\n{solution}",
-            source="jee_bench",
-            confidence=jee_result.get("confidence", 0.9),
-            references=[f"🎯 JEE Bench - {jee_result.get('category', 'Mathematics')}"]
-        )
-    
-    # Step 3: Try web search
-    logger.info("Step 3: Searching on the web...")
-    web_result = await web_search_service.search(validated_query)
-    
-    if web_result and web_result.get("found", False):
-        logger.info("✅ Found via web search")
-        solution = math_solver_service.format_solution(web_result["solution"], validated_query)
+    try:
+        # Define search functions to run in parallel
+        search_functions = [
+            lambda: knowledge_base_service.query(validated_query),
+            lambda: knowledge_base_service.query_jee_bench(validated_query),
+            lambda: web_search_service.search(validated_query),
+            lambda: improved_solver.solve_simple_arithmetic(validated_query) if improved_solver.is_simple_arithmetic(validated_query) else {"found": False},
+            lambda: improved_solver.solve_basic_geometry(validated_query) if improved_solver.is_basic_geometry(validated_query) else {"found": False},
+        ]
         
-        # Create detailed source attribution for web search
-        web_sources = []
-        for ref in web_result.get("references", []):
-            web_sources.append(f"🌐 {ref}")
+        # Execute all search functions in parallel with timeout
+        performance_monitor.log_stage(request_id, "parallel_search_start")
+        results = await parallel_executor.execute_parallel(search_functions, timeout=8.0, return_exceptions=True)
+        performance_monitor.log_stage(request_id, "parallel_search_complete")
+        
+        # Process results in order of preference
+        valid_results = []
+        
+        # Map results to their sources
+        result_sources = [
+            "knowledge_base",
+            "jee_bench",
+            "web_search",
+            "direct_calculation",
+            "geometry_formula"
+        ]
+        
+        # Process each result
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.warning(f"Search function {i} failed: {result}")
+                continue
+            
+            if result and result.get("found", False):
+                source = result_sources[i] if i < len(result_sources) else "unknown"
+                confidence = result.get("confidence", 0.8)
+                valid_results.append((result, source, confidence))
+        
+        # If we have valid results, return the highest confidence one
+        if valid_results:
+            # Sort by confidence (descending)
+            valid_results.sort(key=lambda x: x[2], reverse=True)
+            best_result, source, confidence = valid_results[0]
+            
+            # Format solution based on source
+            if source == "knowledge_base":
+                logger.info("✅ Found in knowledge base")
+                solution = math_solver_service.format_solution(best_result["solution"], validated_query)
+                return MathResponse(
+                    solution=f"**Source: Knowledge Base**\n\n{solution}",
+                    source="knowledge_base",
+                    confidence=best_result.get("confidence", 0.85),
+                    references=[f"📚 {ref}" for ref in best_result.get("references", [])]
+                )
+            elif source == "jee_bench":
+                logger.info("✅ Found in JEE Bench dataset")
+                solution = math_solver_service.format_solution(best_result["solution"], validated_query)
+                return MathResponse(
+                    solution=f"**Source: JEE Bench Dataset**\n\n{solution}",
+                    source="jee_bench",
+                    confidence=best_result.get("confidence", 0.9),
+                    references=[f"🎯 JEE Bench - {best_result.get('category', 'Mathematics')}"]
+                )
+            elif source == "web_search":
+                logger.info("✅ Found via web search")
+                solution = math_solver_service.format_solution(best_result["solution"], validated_query)
+                
+                # Create detailed source attribution for web search
+                web_sources = []
+                for ref in best_result.get("references", []):
+                    web_sources.append(f"🌐 {ref}")
+                
+                return MathResponse(
+                    solution=f"**Source: Web Search**\n\n{solution}",
+                    source="web_search",
+                    confidence=best_result.get("confidence", 0.8),
+                    references=web_sources
+                )
+            elif source in ["direct_calculation", "geometry_formula"]:
+                logger.info(f"✅ Solved using {source}")
+                return MathResponse(
+                    solution=f"**Source: {source.replace('_', ' ').title()}**\n\n{best_result['solution']}",
+                    source=source,
+                    confidence=best_result.get("confidence", 0.85),
+                    references=best_result.get("references", [f"🧮 {source.replace('_', ' ').title()}"])
+                )
+        
+        # If no valid results from parallel search, try DSPy feedback-optimized solution
+        performance_monitor.log_stage(request_id, "dspy_feedback_start")
+        dspy_feedback_service = DSPyFeedbackService()
+        dspy_solution = await dspy_feedback_service.solve_problem(validated_query)
+        performance_monitor.log_stage(request_id, "dspy_feedback_complete")
+        
+        if dspy_solution and dspy_solution.get("found", False):
+            logger.info("✅ Generated solution using DSPy feedback-optimized model")
+            return MathResponse(
+                solution=f"**Source: DSPy Optimized**\n\n{dspy_solution['solution']}",
+                source="dspy_optimized",
+                confidence=dspy_solution.get("confidence", 0.85),
+                references=dspy_solution.get("references", ["🔄 DSPy Feedback-Optimized Solution"])
+            )
+        
+        # Final fallback: Generate solution using AI
+        logger.info("Generating solution using AI...")
+        performance_monitor.log_stage(request_id, "ai_generation_start")
+        generated_solution = await improved_solver.generate_comprehensive_solution(validated_query)
+        performance_monitor.log_stage(request_id, "ai_generation_complete")
+        performance_monitor.end_request(request_id)
         
         return MathResponse(
-            solution=f"**Source: Web Search**\n\n{solution}",
-            source="web_search",
-            confidence=web_result.get("confidence", 0.8),
-            references=web_sources
+            solution=f"**Source: AI Generated Solution**\n\n{generated_solution['solution']}",
+            source="generated",
+            confidence=generated_solution.get("confidence", 0.85),
+            references=generated_solution.get("references", ["🤖 AI Generated"])
         )
-    
-    # Step 4: Generate comprehensive solution using AI
-    logger.info("Step 4: Generating AI solution...")
-    generated_solution = await improved_solver.generate_comprehensive_solution(validated_query)
-    
-    return MathResponse(
-        solution=f"**Source: AI Generated Solution**\n\n{generated_solution['solution']}",
-        source="generated",
-        confidence=generated_solution.get("confidence", 0.85),
-        references=generated_solution.get("references", ["🤖 AI Generated"])
-    )
+    except Exception as e:
+        logger.error(f"Error in full search flow: {e}")
+        performance_monitor.end_request(request_id, success=False, source="error", confidence=0.0, error=str(e))
+        raise e
 
 # Request models
 class MathQuery(BaseModel):
@@ -142,12 +252,58 @@ class RequirementsResponse(BaseModel):
     sources_used: Optional[List[str]] = Field(default=None, description="Sources used for generation")
     error: Optional[str] = Field(default=None, description="Error message if generation failed")
 
-@router.post("/solve", response_model=MathResponse)
+@router.post("/solve")
 async def solve_math_problem(
     request: Request,
     math_query: MathQuery = Body(...),
+    stream: bool = False
 ):
-    """Solve a mathematical problem with step-by-step solution - PDF first, then web search"""
+    """Solve a mathematical problem with optional streaming response"""
+    try:
+        # Get service instances
+        knowledge_base_service, web_search_service, math_solver_service, response_formatter, pdf_processor = get_services()
+        
+        # Apply input guardrails
+        validated_query = input_guardrail(math_query.query)
+        
+        # Import improved solver
+        from services.specialized_math_solver import ImprovedMathSolver
+        improved_solver = ImprovedMathSolver()
+        
+        # Initialize caching service
+        caching_service = CachingService()
+        
+        # Check cache first for non-streaming requests
+        if not stream:
+            cache_key = f"math_solution:{validated_query}"
+            cached_result = caching_service.get(cache_key)
+            if cached_result:
+                logger.info("✅ Found solution in cache")
+                return cached_result
+        
+        if stream:
+            return StreamingResponse(
+                stream_solution_updates(request, validated_query),
+                media_type="text/event-stream"
+            )
+        
+        # Execute parallel search flow with timeouts
+        result = await _full_search_flow(
+            knowledge_base_service,
+            web_search_service,
+            math_solver_service,
+            improved_solver,
+            validated_query
+        )
+        
+        # Cache the result
+        caching_service.set(f"math_solution:{validated_query}", result)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error solving math problem: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     try:
         # Get service instances
         knowledge_base_service, web_search_service, math_solver_service, response_formatter, pdf_processor = get_services()
