@@ -17,8 +17,8 @@ class DSPyFeedbackService:
     def __init__(self):
         # Initialize DSPy with Google's Gemini model
         api_key = os.getenv("GOOGLE_API_KEY")
-        # Use langchain's GoogleGenerativeAI instead of dspy's
-        from langchain_google_genai import ChatGoogleGenerativeAI
+        # Use langchain's GoogleGenerativeAI instead of dspy's (commented out due to version conflicts)
+        # from langchain_google_genai import ChatGoogleGenerativeAI
         # Create a wrapper to adapt langchain's LLM to dspy
         class LangchainToDSPyWrapper:
             def __init__(self, langchain_llm):
@@ -38,16 +38,17 @@ class DSPyFeedbackService:
                 model_name = getattr(self.langchain_llm, 'model_name', 'gemini-2.5-flash')
                 api_key = os.getenv("GOOGLE_API_KEY")
                 
-                # Create a new LLM instance with the current temperature
-                temp_llm = ChatGoogleGenerativeAI(
-                    model=model_name,
-                    google_api_key=api_key,
-                    temperature=self.temperature
-                )
+                # Create a new LLM instance with the current temperature (commented out due to version conflicts)
+                # temp_llm = ChatGoogleGenerativeAI(
+                #     model=model_name,
+                #     google_api_key=api_key,
+                #     temperature=self.temperature
+                # )
                 
-                # Use the new LLM instance to invoke the prompt
-                response = temp_llm.invoke(prompt)
-                return response.content
+                # Use fallback response when LLM is unavailable
+                # response = temp_llm.invoke(prompt)
+                # return response.content
+                return f"DSPy feedback unavailable - LLM version conflicts. Query: {prompt[:100]}..."
                 
             # DSPy expects this method for configuring the LM
             def with_config(self, **kwargs):
@@ -61,8 +62,9 @@ class DSPyFeedbackService:
                     setattr(new_wrapper, key, value)
                 return new_wrapper
         
-        langchain_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
-        self.llm = LangchainToDSPyWrapper(langchain_llm)
+        # langchain_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
+        # self.llm = LangchainToDSPyWrapper(langchain_llm)
+        self.llm = None  # Disabled due to version conflicts
         
         # Create a simple retrieval model for DSPy
         class SimpleRM:
@@ -82,8 +84,33 @@ class DSPyFeedbackService:
                 # Return k empty passages
                 return [Passage(f"Passage {i} for query: {query}") for i in range(k)]
         
-        # Configure DSPy with both LM and RM
-        dspy.settings.configure(lm=self.llm, rm=SimpleRM())
+        # Configure DSPy with real Gemini service
+        from .gemini_service import gemini_service
+        
+        if gemini_service.is_available():
+            # Create a DSPy-compatible wrapper for Gemini
+            class GeminiLM:
+                def __init__(self):
+                    self.kwargs = {}
+                    self.history = []
+                
+                def __call__(self, prompt, **kwargs):
+                    try:
+                        # Use the real Gemini service
+                        import asyncio
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        result = loop.run_until_complete(gemini_service.generate_content(str(prompt)))
+                        loop.close()
+                        return result or "No response from Gemini"
+                    except Exception as e:
+                        return f"Gemini error: {str(e)}"
+            
+            dspy.settings.configure(lm=GeminiLM(), rm=SimpleRM())
+        else:
+            # Disable DSPy when Gemini is not available
+            logger.warning("Gemini not available - DSPy feedback disabled")
+            dspy.settings.configure(lm=None, rm=SimpleRM())
         
         # Initialize optimized modules
         self.retriever_module = None

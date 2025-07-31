@@ -11,11 +11,9 @@ import re
 from typing import Dict, Any, List
 from dotenv import load_dotenv
 from .connection_manager import connection_manager
+from .mongodb_service import mongodb_service
 
-# Load environment variables
 load_dotenv()
-
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -41,7 +39,6 @@ class WebSearchService:
             
             logger.info(f"🌐 Web search: {query[:50]}...")
             
-            # Enhanced payload for comprehensive math solutions
             payload = {
                 "api_key": self.tavily_api_key,
                 "query": f"complete step by step mathematical solution: {query}",
@@ -54,13 +51,10 @@ class WebSearchService:
                     "mathway.com",
                     "wolframalpha.com"
                 ],
-                "max_results": 3,  # Exactly 3 results as requested
+                "max_results": 3,
                 "include_answer": True,
-                "include_raw_content": True  # Need content for complete solutions
+                "include_raw_content": True
             }
-            
-            # Make API call with configurable timeout
-            # Make API call with configurable timeout
             try:
                 result = await asyncio.wait_for(
                     connection_manager.post_json(
@@ -86,6 +80,14 @@ class WebSearchService:
                     if combined_content:
                         # Create complete medium-length solution
                         complete_solution = self._create_complete_solution(combined_content, query)
+
+                        # 🚀 Store in MongoDB for ultra-fast future access
+                        await mongodb_service.store_web_search_cache(
+                            query, 
+                            complete_solution, 
+                            source_names[:3], 
+                            0.8
+                        )
 
                         return {
                             "found": True,

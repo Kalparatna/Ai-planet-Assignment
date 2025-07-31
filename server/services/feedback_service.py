@@ -7,7 +7,7 @@ import dspy
 from pydantic import BaseModel
 import hashlib
 import re
-from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain_google_genai import ChatGoogleGenerativeAI  # Commented out due to version conflicts
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,11 +47,13 @@ class FeedbackService:
         
         # Initialize LLM for solution improvement (fallback from DSPy)
         try:
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
-                google_api_key=os.getenv("GOOGLE_API_KEY"),
-                temperature=0.3
-            )
+            # LLM initialization commented out due to version conflicts
+            # self.llm = ChatGoogleGenerativeAI(
+            #     model="gemini-2.5-flash",
+            #     google_api_key=os.getenv("GOOGLE_API_KEY"),
+            #     temperature=0.3
+            # )
+            self.llm = None
         except Exception as e:
             logger.error(f"Error initializing LLM: {e}")
             self.llm = None

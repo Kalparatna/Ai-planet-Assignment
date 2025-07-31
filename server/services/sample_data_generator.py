@@ -5,7 +5,6 @@ Sample Data Generator - Creates sample mathematical problems for the knowledge b
 import json
 import logging
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
 class SampleDataGenerator:

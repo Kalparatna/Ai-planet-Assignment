@@ -8,21 +8,27 @@ import logging
 from typing import Dict, Any, List, Optional
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from langchain.retrievers.document_compressors import LLMChainExtractor
-from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain.retrievers.document_compressors import LLMChainExtractor  # Commented out due to version conflicts
+# from langchain_google_genai import ChatGoogleGenerativeAI  # Commented out due to version conflicts
 from services.caching_service import cached
 
-# Import our modular components
-from .vector_store_manager import VectorStoreManager
+# Configure logging first
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+try:
+    from .pinecone_vector_store import PineconeVectorStoreManager as VectorStoreManager
+    logger.info("Using real Pinecone vector store")
+except Exception as e:
+    logger.warning(f"Pinecone not available, using mock: {e}")
+    from .vector_store_manager import VectorStoreManager
+
 from .jee_bench_loader import JEEBenchLoader
 from .query_processor import QueryProcessor
 from .content_generator import ContentGenerator
 from .custom_retriever import CustomContextualRetriever
 from .sample_data_generator import SampleDataGenerator
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from .mongodb_service import mongodb_service
 
 class KnowledgeBaseService:
     """Main service for mathematical knowledge base operations"""
@@ -31,34 +37,33 @@ class KnowledgeBaseService:
         self.math_data_file = "data/math_problems.json"
         self.jee_bench_file = "data/jee_bench_data.json"
         
-        # Pinecone configuration
         self.index_name = os.getenv("PINECONE_INDEX_NAME", "math-routing-agent")
         self.jee_index_name = "jee-bench-problems"
         
-        # Create directories if they don't exist
         os.makedirs("data", exist_ok=True)
         
-        # Initialize components
         self.vector_manager = VectorStoreManager()
         self.jee_loader = JEEBenchLoader(self.jee_bench_file)
         self.query_processor = QueryProcessor()
         self.content_generator = ContentGenerator()
         self.sample_generator = SampleDataGenerator()
         
-        # Initialize vector stores
         self._initialize_vector_store()
-        self._initialize_jee_bench()
+        # JEE bench initialization REMOVED per user requirements
+        # self._initialize_jee_bench()
         
-        # Initialize LLM for contextual compression
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash", 
-            google_api_key=os.getenv("GOOGLE_API_KEY")
-        )
+        # LLM initialization commented out due to version conflicts
+        # try:
+        #     self.llm = ChatGoogleGenerativeAI(
+        #         model="gemini-2.5-flash", 
+        #         google_api_key=os.getenv("GOOGLE_API_KEY")
+        #     )
+        # except Exception as e:
+        #     logger.error(f"Error initializing LLM: {e}")
+        self.llm = None
         
-        # Create compressor for better retrieval
-        self.compressor = LLMChainExtractor.from_llm(self.llm)
-        
-        # Expose Pinecone client for external access (needed by math_router.py)
+        # self.compressor = LLMChainExtractor.from_llm(self.llm)  # Commented out due to version conflicts
+        self.compressor = None
         self.pc = self.vector_manager.pc
     
     def _initialize_vector_store(self):
@@ -149,7 +154,7 @@ class KnowledgeBaseService:
     
     @cached(prefix="kb_query", ttl=3600)  # Cache for 1 hour
     async def query(self, query: str) -> Dict[str, Any]:
-        """Query the knowledge base for a mathematical problem with caching and adaptive chunking"""
+        """Query the knowledge base for a mathematical problem with MongoDB first, then vector store"""
         try:
             # Import performance monitor
             from .performance_monitor import PerformanceMonitor
@@ -157,6 +162,23 @@ class KnowledgeBaseService:
             request_id = f"kb_query_{hash(query)}"
             performance_monitor.start_request(request_id, "knowledge_base_query", query)
             
+            # 🚀 ULTRA-FAST: Check MongoDB first (0.01-0.1 seconds)
+            performance_monitor.log_stage(request_id, "mongodb_check_start")
+            mongodb_result = await mongodb_service.get_math_solution(query)
+            if mongodb_result and mongodb_result.get("found"):
+                performance_monitor.log_stage(request_id, "mongodb_check_complete")
+                performance_monitor.end_request(request_id, source="MongoDB")
+                return {
+                    "found": True,
+                    "problem": query,
+                    "solution": mongodb_result["solution"],
+                    "confidence": mongodb_result.get("confidence", 0.9),
+                    "references": ["MongoDB Cache - Ultra Fast Response"],
+                    "source": "MongoDB"
+                }
+            performance_monitor.log_stage(request_id, "mongodb_check_complete")
+            
+            # Fallback to vector store if not in MongoDB
             if not self.vector_store:
                 performance_monitor.end_request(request_id)
                 return {"found": False}

@@ -6,7 +6,7 @@ import asyncio
 from typing import AsyncGenerator, Dict, Any, List, Optional, Callable
 from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.outputs import LLMResult
-from langchain_google_genai import ChatGoogleGenerativeAI
+import google.generativeai as genai  
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -51,29 +51,23 @@ class StreamingService:
     
     def __init__(self):
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
+        # Initialize Google Gemini model
+        if self.google_api_key:
+            genai.configure(api_key=self.google_api_key)
+            self.model = genai.GenerativeModel('gemini-2.5-flash')
+        else:
+            self.model = None
     
-    def get_streaming_llm(self, streaming_handler: TokenStreamingHandler) -> ChatGoogleGenerativeAI:
-        """Get LLM configured for streaming"""
-        return ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
-            google_api_key=self.google_api_key,
-            streaming=True,
-            callbacks=[streaming_handler]
-        )
+    def get_streaming_llm(self, streaming_handler: TokenStreamingHandler):
+        """Get LLM configured for streaming - using Google Gemini API"""
+        return self.model 
     
-    def configure_llm_for_streaming(self, llm: ChatGoogleGenerativeAI) -> ChatGoogleGenerativeAI:
-        """Configure an existing LLM for streaming"""
+    def configure_llm_for_streaming(self, llm=None):
+        """Configure an existing LLM for streaming - using Google Gemini API"""
         streaming_handler = TokenStreamingHandler()
         
-        # Create a new LLM instance with streaming enabled
-        streaming_llm = ChatGoogleGenerativeAI(
-            model=llm.model_name,
-            google_api_key=self.google_api_key,
-            streaming=True,
-            callbacks=[streaming_handler]
-        )
-        
-        return streaming_llm
+        # Return the Gemini model configured for streaming
+        return self.model
     
     async def stream_llm_response(self, llm=None, prompt: str = None) -> AsyncGenerator[str, None]:
         """Stream response from LLM token by token"""

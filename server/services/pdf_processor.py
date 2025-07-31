@@ -5,12 +5,11 @@ import hashlib
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 import PyPDF2
-import fitz  # PyMuPDF
+import fitz
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-# Removed Pinecone imports
 import numpy as np
-from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain_google_genai import ChatGoogleGenerativeAI  # Commented out due to version conflicts
 import aiofiles
 from fastapi import UploadFile
 import tempfile
@@ -27,36 +26,28 @@ class PDFProcessor:
         self.processed_pdfs_file = "data/processed_pdfs.json"
         self.pdf_index_name = "math-pdf-documents"
         
-        # Create directories
         os.makedirs(self.upload_dir, exist_ok=True)
         os.makedirs("data", exist_ok=True)
         
-        # Initialize processed PDFs tracking
         if not os.path.exists(self.processed_pdfs_file):
             with open(self.processed_pdfs_file, "w") as f:
                 json.dump([], f)
         
-        # Use mock embeddings instead of Pinecone
         self.pinecone_api_key = None
-        
-        # Create a mock embeddings class
         class MockEmbeddings:
             def __init__(self):
                 self.dimension = 384
                 logger.info(f"Using mock embeddings with dimension: {self.dimension}")
                 
             def embed_documents(self, texts):
-                # Return random embeddings with the correct dimension
                 return [np.random.rand(self.dimension).tolist() for _ in texts]
                 
             def embed_query(self, text):
-                # Return a random embedding with the correct dimension
                 return np.random.rand(self.dimension).tolist()
         
         self.embeddings = MockEmbeddings()
         logger.info("Using mock embeddings for PDF processing")
         
-        # Create a mock vector store
         class MockVectorStore:
             def __init__(self):
                 self.documents = []
@@ -67,25 +58,16 @@ class PDFProcessor:
                 return len(documents)
                 
             def similarity_search(self, query, k=4):
-                # Return a subset of documents (or empty list if none)
                 return self.documents[:min(k, len(self.documents))]
         
-        # Initialize mock vector store
         self.vector_store = MockVectorStore()
         self.pdf_vector_store = self.vector_store
         logger.info("Initialized mock vector store for PDFs")
         
-        # Initialize LLM for content analysis
-        try:
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash", 
-                google_api_key=os.getenv("GOOGLE_API_KEY")
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize LLM: {e}")
-            self.llm = None
+        # Use the working Gemini service instead of problematic LangChain
+        from .gemini_service import gemini_service
+        self.llm = gemini_service
         
-        # Text splitter for chunking
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
@@ -343,8 +325,11 @@ class PDFProcessor:
             }
     
     async def _generate_answer_from_pdf_content(self, query: str, content: str) -> str:
-        """Generate answer from PDF content using LLM"""
+        """Generate answer from PDF content using Gemini"""
         try:
+            if not self.llm or not self.llm.is_available():
+                return f"Based on the PDF content: {content[:500]}..."
+            
             prompt = f"""
             Based on the following content from uploaded PDF documents, please answer the question step by step.
             
@@ -357,12 +342,12 @@ class PDFProcessor:
             If the content doesn't contain enough information to answer the question, please state that clearly.
             """
             
-            response = await self.llm.ainvoke(prompt)
+            response = await self.llm.generate_content(prompt)
             
-            if hasattr(response, 'content'):
-                return response.content
+            if response:
+                return response
             else:
-                return str(response)
+                return f"Based on the PDF content: {content[:500]}..."
                 
         except Exception as e:
             logger.error(f"Error generating answer from PDF content: {e}")

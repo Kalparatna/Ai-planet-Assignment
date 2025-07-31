@@ -58,12 +58,22 @@ class VectorStoreManager:
     def __init__(self):
         logger.warning("Using mock VectorStoreManager without Pinecone")
         # Create a mock Pinecone client for compatibility
-        self.pc = type('MockPinecone', (), {
-            'Index': lambda _, name: type('MockIndex', (), {
-                'describe_index_stats': lambda: {'total_vector_count': 0}
-            })(),
-            'list_indexes': lambda: type('MockIndexList', (), {'names': lambda: []})(),
-        })()
+        class MockIndex:
+            def describe_index_stats(self):
+                return {'total_vector_count': 0}
+        
+        class MockIndexList:
+            def names(self):
+                return []
+        
+        class MockPinecone:
+            def Index(self, name):
+                return MockIndex()
+            
+            def list_indexes(self):
+                return MockIndexList()
+        
+        self.pc = MockPinecone()
         
         # Initialize mock embeddings
         self.embeddings = MockEmbeddings()

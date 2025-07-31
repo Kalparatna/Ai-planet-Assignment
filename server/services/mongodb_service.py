@@ -71,22 +71,47 @@ class MongoDBService:
     
     # MATH SOLUTIONS OPERATIONS
     async def get_math_solution(self, query: str) -> Optional[Dict[str, Any]]:
-        """Get math solution from MongoDB - ULTRA FAST"""
+        """Get math solution from MongoDB with STRICT query matching - NO RANDOM ANSWERS"""
         try:
-            # Text search with high relevance
-            result = await self.collections['math_solutions'].find_one(
-                {"$text": {"$search": query}},
+            query_lower = query.lower().strip()
+            
+            # STRICT: Only exact matches or very high similarity
+            # First try exact match
+            exact_result = await self.collections['math_solutions'].find_one(
+                {"query": query_lower},
                 {"solution": 1, "confidence": 1, "category": 1, "_id": 0}
             )
             
-            if result:
+            if exact_result:
+                logger.info(f"✅ EXACT match found for: {query}")
                 return {
                     "found": True,
-                    "solution": result["solution"],
-                    "confidence": result.get("confidence", 0.9),
-                    "source": "MongoDB Cache"
+                    "solution": exact_result["solution"],
+                    "confidence": exact_result.get("confidence", 0.9),
+                    "source": "Knowledge Base"
                 }
             
+            # Check for basic math patterns only (no random text search)
+            basic_patterns = {
+                "area of circle": "A = πr² where r is the radius",
+                "area of rectangle": "A = length × width", 
+                "pythagorean theorem": "a² + b² = c² where c is the hypotenuse",
+                "quadratic formula": "x = (-b ± √(b²-4ac)) / 2a",
+                "slope formula": "m = (y₂-y₁)/(x₂-x₁)"
+            }
+            
+            for pattern, solution in basic_patterns.items():
+                if pattern in query_lower:
+                    logger.info(f"✅ Basic pattern match found: {pattern}")
+                    return {
+                        "found": True,
+                        "solution": f"**Formula:** {solution}\n\n**This is a fundamental mathematical concept.**",
+                        "confidence": 0.95,
+                        "source": "Knowledge Base"
+                    }
+            
+            # NO TEXT SEARCH - prevents random answers
+            logger.info(f"❌ No exact match found in knowledge base for: {query}")
             return None
             
         except Exception as e:
@@ -105,10 +130,19 @@ class MongoDBService:
                 "usage_count": 1
             }
             
-            # Upsert to avoid duplicates
+            # Upsert to avoid duplicates - fix usage_count conflict
             await self.collections['math_solutions'].update_one(
                 {"query": query.lower().strip()},
-                {"$set": document, "$inc": {"usage_count": 1}},
+                {
+                    "$set": {
+                        "query": document["query"],
+                        "solution": document["solution"],
+                        "category": document["category"],
+                        "confidence": document["confidence"],
+                        "created_at": document["created_at"]
+                    },
+                    "$inc": {"usage_count": 1}
+                },
                 upsert=True
             )
             
@@ -155,28 +189,8 @@ class MongoDBService:
         except Exception as e:
             logger.error(f"Error storing web search cache: {e}")
     
-    # JEE BENCH DATA OPERATIONS
-    async def get_jee_solution(self, query: str) -> Optional[Dict[str, Any]]:
-        """Get JEE bench solution - ULTRA FAST"""
-        try:
-            result = await self.collections['jee_bench_data'].find_one(
-                {"$text": {"$search": query}},
-                {"solution": 1, "subject": 1, "difficulty": 1, "_id": 0}
-            )
-            
-            if result:
-                return {
-                    "found": True,
-                    "solution": result["solution"],
-                    "confidence": 0.9,
-                    "source": "JEE Bench Data"
-                }
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error getting JEE solution: {e}")
-            return None
+    # JEE BENCH DATA OPERATIONS REMOVED PER USER REQUIREMENTS
+    # User specifically requested NO JEE bench data - only sample data, web search, and AI generation
     
     async def store_jee_data(self, problems: List[Dict[str, Any]]):
         """Store JEE bench data in MongoDB"""

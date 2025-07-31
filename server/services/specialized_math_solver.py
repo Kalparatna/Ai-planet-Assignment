@@ -10,7 +10,6 @@ from typing import Dict, Any, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from services.caching_service import cached
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -85,18 +84,19 @@ class ImprovedMathSolver:
         performance_monitor.start_request(request_id, "arithmetic_solve", query)
         
         try:
-            prompt = f"""
-            Solve this simple arithmetic problem step by step:
-            
+          prompt = f"""
+            Solve the following arithmetic problem step by step:
+
             Question: {query}
-            
-            Please provide:
-            1. A clear step-by-step solution
-            2. The final answer
-            3. Show all calculations
-            
-            Format your response as a complete mathematical solution.
+
+            Instructions:
+            1. Show all necessary calculations clearly.
+            2. Provide a concise, well-structured solution.
+            3. Conclude with the final answer.
+
+            Avoid unnecessary explanation — keep the response brief and focused on the math.
             """
+
             
             # Get streaming service for token-by-token generation
             from .streaming_service import StreamingService
