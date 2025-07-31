@@ -6,7 +6,7 @@ import asyncio
 from typing import AsyncGenerator, Dict, Any, List, Optional, Callable
 from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.outputs import LLMResult
-import google.generativeai as genai  # Using correct Google Gemini API
+import google.generativeai as genai  
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

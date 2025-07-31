@@ -37,12 +37,19 @@ class GeminiService:
             self.model = None
     
     async def generate_content(self, prompt: str) -> Optional[str]:
-        """Generate content using Google Gemini API"""
+        """Generate content using Google Gemini API - concise responses"""
         try:
             if not self.model:
                 return None
             
-            response = self.model.generate_content(prompt)
+            # Add instruction for concise responses
+            concise_prompt = f"""
+            {prompt}
+            
+            Instructions: Be concise and direct. Avoid unnecessary explanations. Focus on essential information only.
+            """
+            
+            response = self.model.generate_content(concise_prompt)
             
             return response.text
             
@@ -59,18 +66,24 @@ class GeminiService:
                     "error": "Gemini model not available"
                 }
             
-            # Create a detailed math prompt
+            # Create a concise math prompt for focused solutions
             prompt = f"""
-            You are a mathematical professor. Solve this math problem step by step:
-            
+            Solve this math problem with simple, clear steps. Be concise and direct.
+
             Problem: {query}
-            
-            Please provide:
-            1. A clear step-by-step solution
-            2. The final answer
-            3. Any relevant formulas or concepts used
-            
-            Format your response clearly and concisely.
+
+            Instructions:
+            - Show only essential steps
+            - No lengthy explanations
+            - Use simple language
+            - Focus on the solution process
+            - End with the final answer
+
+            Format:
+            Step 1: [action]
+            Step 2: [action]
+            ...
+            Answer: [final result]
             """
             
             response = self.model.generate_content(prompt)
