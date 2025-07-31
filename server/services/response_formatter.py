@@ -16,17 +16,12 @@ class ResponseFormatter:
     def format_for_ui(self, solution: str, problem: str = None) -> Dict[str, Any]:
         """Format solution for UI display with proper structure"""
         
-        # Clean and structure the solution
         formatted_solution = self._clean_and_structure(solution)
         
-        # Extract problem if not provided
         if not problem:
             problem = self._extract_problem(formatted_solution)
         
-        # Parse the solution into structured sections
         sections = self._parse_into_sections(formatted_solution)
-        
-        # Format the final response
         return {
             "problem": self._format_problem(problem),
             "solution": self._format_solution_content(formatted_solution),

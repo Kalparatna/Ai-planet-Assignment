@@ -11,6 +11,7 @@ from services.web_search import WebSearchService
 from services.math_solution_formatter import MathSolverService
 from services.response_formatter import ResponseFormatter
 from services.pdf_processor import PDFProcessor
+from services.simplified_math_router import simplified_math_router
 from middleware.guardrails import input_guardrail, output_guardrail
 
 # Configure logging
@@ -51,7 +52,59 @@ from services.streaming_service import StreamingService
 from services.parallel_executor import ParallelExecutor
 from services.dspy_feedback_loop import DSPyFeedbackService
 
-# Full search flow function with streaming
+# Simplified streaming function
+async def stream_simplified_solution(request: Request, query: str) -> AsyncGenerator[str, None]:
+    """Stream solution updates using simplified flow"""
+    try:
+        yield f"🎯 Starting simplified math solving for: {query[:50]}...\n\n"
+        
+        # Phase 1: PDF Documents
+        yield "📄 PHASE 1: Checking PDF documents...\n"
+        pdf_result = await simplified_math_router._check_pdf_documents(query)
+        if pdf_result and pdf_result.get("found", False):
+            yield f"✅ Found in PDF documents!\n\n"
+            yield f"**Solution:**\n{pdf_result.get('solution', '')}\n\n"
+            yield f"**Source:** {pdf_result.get('source', 'PDF Document')}\n"
+            return
+        yield "❌ Not found in PDF documents\n\n"
+        
+        # Phase 2: Knowledge Base
+        yield "📚 PHASE 2: Checking knowledge base...\n"
+        sample_result = await simplified_math_router._check_knowledge_base(query)
+        if sample_result and sample_result.get("found", False):
+            yield f"✅ Found in sample data!\n\n"
+            yield f"**Solution:**\n{sample_result.get('solution', '')}\n\n"
+            yield f"**Source:** {sample_result.get('source', 'Sample Data')}\n"
+            return
+        yield "❌ Not found in sample data\n\n"
+        
+        # Phase 2: Web Search
+        yield "🌐 PHASE 2: Performing web search (5s timeout)...\n"
+        web_result = await simplified_math_router._search_web_with_timeout(query)
+        if web_result and web_result.get("found", False):
+            yield f"✅ Found via web search!\n\n"
+            yield f"**Solution:**\n{web_result.get('solution', '')}\n\n"
+            yield f"**Source:** {web_result.get('source', 'Web Search')}\n"
+            return
+        yield "❌ Web search failed or timed out\n\n"
+        
+        # Phase 3: AI Generation
+        yield "🤖 PHASE 3: Generating AI solution...\n"
+        ai_result = await simplified_math_router._generate_ai_solution(query)
+        if ai_result and ai_result.get("found", False):
+            yield f"✅ AI solution generated!\n\n"
+            yield f"**Solution:**\n{ai_result.get('solution', '')}\n\n"
+            yield f"**Source:** {ai_result.get('source', 'AI Generated')}\n"
+            return
+        
+        # Fallback
+        yield "❌ All phases failed. Unable to solve the problem.\n"
+        yield "Please try rephrasing your question or provide more details.\n"
+        
+    except Exception as e:
+        yield f"❌ Error in streaming: {str(e)}\n"
+
+# Full search flow function with streaming (DEPRECATED - keeping for compatibility)
 async def stream_solution_updates(request: Request, query: str) -> AsyncGenerator[str, None]:
     """Stream solution updates to the client"""
     # Get streaming service
@@ -95,13 +148,47 @@ async def _full_search_flow(knowledge_base_service, web_search_service, math_sol
     performance_monitor.start_request(request_id, "math_solve", validated_query)
     
     try:
-        # Define search functions to run in parallel
+        # Define search functions to run in parallel - wrap in async functions
+        async def safe_kb_query():
+            try:
+                return await knowledge_base_service.query(validated_query)
+            except Exception as e:
+                return {"found": False, "error": str(e)}
+        
+        async def safe_jee_query():
+            try:
+                return await knowledge_base_service.query_jee_bench(validated_query)
+            except Exception as e:
+                return {"found": False, "error": str(e)}
+        
+        async def safe_web_search():
+            try:
+                return await web_search_service.search(validated_query)
+            except Exception as e:
+                return {"found": False, "error": str(e)}
+        
+        async def safe_arithmetic():
+            try:
+                if improved_solver.is_simple_arithmetic(validated_query):
+                    return await improved_solver.solve_simple_arithmetic(validated_query)
+                return {"found": False}
+            except Exception as e:
+                return {"found": False, "error": str(e)}
+        
+        async def safe_geometry():
+            try:
+                if improved_solver.is_basic_geometry(validated_query):
+                    return await improved_solver.solve_basic_geometry(validated_query)
+                return {"found": False}
+            except Exception as e:
+                return {"found": False, "error": str(e)}
+        
         search_functions = [
-            lambda: knowledge_base_service.query(validated_query),
-            lambda: knowledge_base_service.query_jee_bench(validated_query),
-            lambda: web_search_service.search(validated_query),
-            lambda: improved_solver.solve_simple_arithmetic(validated_query) if improved_solver.is_simple_arithmetic(validated_query) else {"found": False},
-            lambda: improved_solver.solve_basic_geometry(validated_query) if improved_solver.is_basic_geometry(validated_query) else {"found": False},
+            safe_kb_query,
+            safe_jee_query,
+            safe_web_search,
+            safe_arithmetic,
+            safe_geometry,
         ]
         
         # Execute all search functions in parallel with timeout
@@ -258,30 +345,43 @@ async def solve_math_problem(
     math_query: MathQuery = Body(...),
     stream: bool = False
 ):
-    """Solve a mathematical problem with optional streaming response"""
+    """
+    Solve a mathematical problem using SIMPLIFIED FLOW:
+    1. Sample Data (MongoDB Cache) - Ultra Fast
+    2. Web Search (5 second timeout)
+    3. AI Generation (Fallback)
+    NO JEE BENCH DATA
+    """
     try:
-        # Get service instances
-        knowledge_base_service, web_search_service, math_solver_service, response_formatter, pdf_processor = get_services()
-        
-        # Apply input guardrails
-        validated_query = input_guardrail(math_query.query)
-        
-        # Import improved solver
-        from services.specialized_math_solver import ImprovedMathSolver
-        improved_solver = ImprovedMathSolver()
-        
-        # Initialize caching service
-        caching_service = CachingService()
-        
-        # Check cache first for non-streaming requests
-        if not stream:
-            cache_key = f"math_solution:{validated_query}"
-            cached_result = caching_service.get(cache_key)
-            if cached_result:
-                logger.info("✅ Found solution in cache")
-                return cached_result
+        logger.info(f"🎯 SIMPLIFIED Math Solving: {math_query.query[:50]}...")
         
         if stream:
+            # For streaming, we'll use a simple approach
+            return StreamingResponse(
+                stream_simplified_solution(request, math_query.query),
+                media_type="text/plain"
+            )
+        else:
+            # Use the simplified router for non-streaming requests
+            result = await simplified_math_router.solve_math_problem(math_query.query)
+            
+            if result.get("found", False):
+                logger.info(f"✅ Solution found via {result.get('source', 'Unknown')} in {result.get('response_time', 0):.3f}s")
+                return result
+            else:
+                logger.warning(f"❌ No solution found: {result.get('solution', 'Unknown error')}")
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "message": "No solution found",
+                        "query": math_query.query,
+                        "suggestions": [
+                            "Try rephrasing your question",
+                            "Break down complex problems into smaller parts",
+                            "Check for typos in mathematical expressions"
+                        ]
+                    }
+                )
             return StreamingResponse(
                 stream_solution_updates(request, validated_query),
                 media_type="text/event-stream"

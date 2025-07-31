@@ -10,7 +10,6 @@ from typing import Dict, Any, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from services.caching_service import cached
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

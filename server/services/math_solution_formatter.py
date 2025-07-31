@@ -2,15 +2,12 @@ import os
 import json
 import logging
 from typing import Dict, Any, List, Optional
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import PromptTemplate
+# from langchain_google_genai import ChatGoogleGenerativeAI  # Commented out due to version conflicts
+# from langchain.prompts import PromptTemplate  # Commented out due to version conflicts
 from langchain_core.runnables import RunnableSequence
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
-
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -19,24 +16,22 @@ class MathSolverService:
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
         self.solutions_file = "data/generated_solutions.json"
         
-        # Create directories if they don't exist
         os.makedirs("data", exist_ok=True)
         
-        # Initialize solutions storage
         if not os.path.exists(self.solutions_file):
             with open(self.solutions_file, "w") as f:
                 json.dump([], f)
-        
-        # Initialize LLM
         try:
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
-                google_api_key=self.google_api_key,
-                temperature=0.2,
-                top_p=0.95,
-                top_k=40,
-                max_output_tokens=2048,
-            )
+            # LLM initialization commented out due to version conflicts
+            # self.llm = ChatGoogleGenerativeAI(
+            #     model="gemini-2.5-flash",
+            #     google_api_key=self.google_api_key,
+            #     temperature=0.2,
+            #     top_p=0.95,
+            #     top_k=40,
+            #     max_output_tokens=2048,
+            # )
+            self.llm = None
             
             # Create solution generation prompt
             solution_template = """
@@ -56,13 +51,15 @@ class MathSolverService:
             Your solution should be detailed enough that a student can learn from it, not just see the answer.
             """
             
-            self.solution_prompt = PromptTemplate(
-                template=solution_template,
-                input_variables=["problem"]
-            )
+            # self.solution_prompt = PromptTemplate(
+            #     template=solution_template,
+            #     input_variables=["problem"]
+            # )
+            self.solution_prompt = None
             
-            # Create the chain using the new RunnableSequence approach
-            self.solution_chain = self.solution_prompt | self.llm
+            # Create the chain using the new RunnableSequence approach (commented out due to version conflicts)
+            # self.solution_chain = self.solution_prompt | self.llm
+            self.solution_chain = None
         
         except Exception as e:
             logger.error(f"Error initializing MathSolverService: {e}")
